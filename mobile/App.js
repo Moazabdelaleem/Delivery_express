@@ -1564,23 +1564,13 @@ function MainApp() {
       <SafeAreaView style={[styles.container, theme.bg]}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-        <View style={[styles.hostBanner, theme.cardBg, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
-          <Text style={[styles.hostLabel, theme.textMuted]}>{t('serverIpLabel')}</Text>
-          <TextInput
-            style={[styles.hostInput, theme.text, { textAlign: isRTL ? 'right' : 'left' }]}
-            value={serverHost}
-            onChangeText={setServerHost}
-            placeholder="192.168.1.15"
-            placeholderTextColor="#94a3b8"
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <TouchableOpacity style={[styles.themeToggleBtn, theme.inputBg]} onPress={() => setIsDarkMode(!isDarkMode)}>
-              <Text style={[styles.themeToggleText, theme.text]}>{isDarkMode ? t('lightMode') : t('darkMode')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.langBtn} onPress={toggleLanguage}>
-              <Text style={styles.langBtnText}>🌐 {t('languageName')}</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-end', gap: 6, padding: 10 }}>
+          <TouchableOpacity style={[styles.themeToggleBtn, theme.inputBg]} onPress={() => setIsDarkMode(!isDarkMode)}>
+            <Text style={[styles.themeToggleText, theme.text]}>{isDarkMode ? t('lightMode') : t('darkMode')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.langBtn} onPress={toggleLanguage}>
+            <Text style={styles.langBtnText}>🌐 {t('languageName')}</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.authHeader}>
