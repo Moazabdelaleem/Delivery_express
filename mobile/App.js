@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
-  Alert
+  Alert,
+  Vibration
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -768,6 +769,7 @@ function MainApp() {
 
     socket.on('order_assigned', (data) => {
       if (user.role === 'delivery_guy' && data.delivery_guy_id === user.id) {
+        try { Vibration.vibrate([0, 500, 200, 500]); } catch (e) {}
         showToast(lang === 'ar' ? '🚀 تم إسناد شحنة جديدة لك!' : '🚀 New order assigned to you!');
       }
       fetchData();
