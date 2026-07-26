@@ -7,11 +7,20 @@ const roleCheck = require('../middleware/roleCheck');
 // Create order - Supervisor
 router.post('/', authMiddleware, roleCheck(['supervisor']), orderController.createOrder);
 
+// Edit order - Supervisor
+router.put('/:id', authMiddleware, roleCheck(['supervisor']), orderController.updateOrder);
+
+// Delete order - Supervisor
+router.delete('/:id', authMiddleware, roleCheck(['supervisor']), orderController.deleteOrder);
+
 // Assign order - Supervisor
 router.put('/:order_id/assign', authMiddleware, roleCheck(['supervisor']), orderController.assignOrder);
 
 // Inventory handoff confirmation - Inventory
 router.put('/:order_id/handoff', authMiddleware, roleCheck(['inventory']), orderController.inventoryHandoff);
+
+// Inventory undo handoff - Inventory
+router.put('/:order_id/undo-handoff', authMiddleware, roleCheck(['inventory']), orderController.undoHandoff);
 
 // Update delivery status - Delivery Guy
 router.put('/:order_id/delivery-status', authMiddleware, roleCheck(['delivery_guy']), orderController.updateDeliveryStatus);

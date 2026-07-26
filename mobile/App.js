@@ -168,7 +168,7 @@ const translations = {
     dispatchOrder: "➕ Dispatch New Order",
     allOrders: "📋 All Active Orders",
     statusLabel: "Status",
-    orderAmountLabel: "Price / Order Amount ($) *",
+    orderAmountLabel: "Amount to Collect ($) *",
 
     warehouseQueue: "📦 Warehouse Package Queue",
     confirmHandoff: "📦 Confirm Warehouse Handoff",
@@ -356,7 +356,7 @@ const translations = {
     dispatchOrder: "➕ إضافة وإسناد شحنة جديدة",
     allOrders: "📋 سجل الشحنات النشطة",
     statusLabel: "الحالة",
-    orderAmountLabel: "السعر / قيمة الشحنة ($) *",
+    orderAmountLabel: "مبلغ التحصيل ($) *",
 
     warehouseQueue: "📦 قائمة الشحنات بالمخزن",
     confirmHandoff: "📦 تأكيد تسليم الشحنة للمندوب",
@@ -620,9 +620,13 @@ function MainApp() {
   const [expenseReason, setExpenseReason] = useState('');
 
   const [createOrderModal, setCreateOrderModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+  const [orderNumber, setOrderNumber] = useState('');
   const [clientAddress, setClientAddress] = useState('');
   const [orderAmount, setOrderAmount] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+
+  const [inventoryFilter, setInventoryFilter] = useState('all');
 
   const [failureModal, setFailureModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -1079,15 +1083,36 @@ function MainApp() {
     setFailureReason('');
   };
 
-  const handleConfirmInventoryIssue = () => {
+  const handleConfirmInventoryIssue = async () => {
     if (!inventoryIssueReason.trim()) {
       Alert.alert(t('alertError'), t('mandatoryReasonLabel'));
       return;
     }
-    updateDeliveryStatus(selectedOrderId, 'pickup_failed', 0, inventoryIssueReason.trim());
-    setInventoryIssueModal(false);
-    setSelectedOrderId(null);
-    setInventoryIssueReason('');
+    setActionLoadingId(`issue_${selectedOrderId}`);
+    try {
+      const res = await fetch(`${apiBase}/orders/${selectedOrderId}/handoff`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ handed_over: false, note: inventoryIssueReason.trim() })
+      });
+      if (res.ok) {
+        showToast(lang === 'ar' ? '⚠️ تم تسجيل البلاغ بنجاح' : '⚠️ Staging issue recorded successfully');
+        fetchData();
+      } else {
+        const data = await res.json();
+        Alert.alert(t('alertError'), data.error || 'Failed to record issue');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+      setInventoryIssueModal(false);
+      setSelectedOrderId(null);
+      setInventoryIssueReason('');
+    }
   };
 
   const handleFinancePullout = (driver) => {
@@ -1294,37 +1319,118 @@ function MainApp() {
     }
   };
 
+  const handleUndoHandoff = async (orderId) => {
+    setActionLoadingId(`undo_${orderId}`);
+    try {
+      const res = await fetch(`${apiBase}/orders/${orderId}/undo-handoff`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showToast(lang === 'ar' ? '↩️ تم إلغاء التسليم وإرجاع الشحنة للمخزن' : '↩️ Handoff undone! Order returned to warehouse queue.');
+        fetchData();
+      } else {
+        const d = await res.json();
+        Alert.alert(t('alertError'), d.error || 'Failed to undo handoff');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeleteOrder = (orderId, trackingNum) => {
+    Alert.alert(
+      lang === 'ar' ? 'تأكيد حذف الشحنة' : 'Confirm Delete Order',
+      lang === 'ar' ? `هل أنت متأكد من حذف الشحنة #${trackingNum} نهائياً؟` : `Are you sure you want to permanently delete order #${trackingNum}?`,
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: lang === 'ar' ? 'حذف' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setActionLoadingId(`delete_${orderId}`);
+            try {
+              const res = await fetch(`${apiBase}/orders/${orderId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (res.ok) {
+                showToast(lang === 'ar' ? '🗑️ تم حذف الشحنة بنجاح' : '🗑️ Order deleted successfully');
+                fetchData();
+              } else {
+                const d = await res.json();
+                Alert.alert(t('alertError'), d.error || 'Failed to delete order');
+              }
+            } catch (e) {
+              Alert.alert(t('alertError'), t('networkError'));
+            } finally {
+              setActionLoadingId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const openEditOrderModal = (order) => {
+    setEditingOrderId(order.id);
+    setOrderNumber(order.tracking_number || '');
+    setClientAddress(order.client_address || '');
+    setOrderAmount(order.order_amount ? String(order.order_amount) : '');
+    setAssigneeId(order.delivery_guy_id || '');
+    setCreateOrderModal(true);
+  };
+
   const handleCreateOrder = async () => {
     if (!clientAddress.trim() || !orderAmount) {
       Alert.alert(t('alertError'), t('addressRequiredMsg'));
       return;
     }
+    if (!assigneeId) {
+      Alert.alert(
+        t('alertError'),
+        lang === 'ar' ? 'يجب تعيين مندوب توصيل أولاً قبل إسناد الشحنة!' : 'A delivery driver must be assigned before dispatching the order!'
+      );
+      return;
+    }
     setActionLoadingId('createOrder');
     try {
-      const res = await fetch(`${apiBase}/orders`, {
-        method: 'POST',
+      const isEditing = Boolean(editingOrderId);
+      const url = isEditing ? `${apiBase}/orders/${editingOrderId}` : `${apiBase}/orders`;
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
+          tracking_number: orderNumber.trim() || undefined,
           client_name: 'Client',
           client_phone: '',
           client_address: clientAddress.trim(),
           order_amount: parseFloat(orderAmount) || 0.00,
-          delivery_guy_id: assigneeId || null
+          delivery_guy_id: assigneeId
         })
       });
       if (res.ok) {
-        showToast(`🚀 ${t('orderCreatedMsg')}`);
+        showToast(isEditing
+          ? (lang === 'ar' ? '✏️ تم تحديث بيانات الشحنة بنجاح!' : '✏️ Order updated successfully!')
+          : `🚀 ${t('orderCreatedMsg')}`
+        );
         setCreateOrderModal(false);
+        setEditingOrderId(null);
+        setOrderNumber('');
         setClientAddress('');
         setOrderAmount('');
         setAssigneeId('');
         fetchData();
       } else {
         const d = await res.json();
-        Alert.alert(t('alertError'), d.error || 'Failed to create order');
+        Alert.alert(t('alertError'), d.error || 'Failed to save order');
       }
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
@@ -2112,7 +2218,25 @@ function MainApp() {
                         </View>
                       </View>
 
-                      <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#2563eb', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={(e) => { e.stopPropagation(); openEditOrderModal(o); }}
+                        >
+                          <Ionicons name="create-outline" size={14} color="#fff" />
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'تعديل' : 'Edit'}</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{ backgroundColor: '#ef4444', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                          onPress={(e) => { e.stopPropagation(); handleDeleteOrder(o.id, o.tracking_number); }}
+                        >
+                          <Ionicons name="trash-outline" size={14} color="#fff" />
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'حذف' : 'Delete'}</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ color: '#2563eb', fontSize: 12, fontWeight: '800' }}>
                           📜 {lang === 'ar' ? 'عرض تتبع رحلة الشحنة' : 'View Action Audit Log'} ➔
                         </Text>
@@ -2197,6 +2321,7 @@ function MainApp() {
         {/* ── ROLE 3: INVENTORY ── */}
         {user.role === 'inventory' && (
           <View>
+            {/* TAB 1: Warehouse Queue (Pending Handoff & Handed Over) */}
             {activeTab === 'tab1' && (
               <View>
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('warehouseQueue')}</Text>
@@ -2206,7 +2331,7 @@ function MainApp() {
                   <TouchableOpacity
                     key={o.id}
                     activeOpacity={0.85}
-                    style={[styles.orderCard, theme.cardBg, styles.statCardAccentAmber]}
+                    style={[styles.orderCard, theme.cardBg, o.status === 'handed_to_delivery' ? styles.statCardAccentEmerald : styles.statCardAccentAmber]}
                     onPress={() => openOrderAuditModal(o)}
                   >
                     <View style={[styles.orderHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
@@ -2216,64 +2341,153 @@ function MainApp() {
                     <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
                       📍 {dt(o.client_address)}
                     </Text>
-                    <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '800', marginTop: 3 }, isRTL && styles.rtlText]}>
-                      💰 ${o.order_amount}
-                    </Text>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                      <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '800' }, isRTL && styles.rtlText]}>
+                        💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                      </Text>
+                      {o.delivery_guy_name ? (
+                        <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
+                          🚚 Rider: {dt(o.delivery_guy_name)}
+                        </Text>
+                      ) : null}
+                    </View>
+
                     <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
                       📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
                     </Text>
 
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#f59e0b', flex: 1, minWidth: 130 }]}
-                        onPress={() => handleInventoryHandoff(o.id)}
-                      >
-                        <Text style={styles.actionBtnText}>{t('confirmHandoff')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#ef4444', flex: 1, minWidth: 130 }]}
-                        onPress={() => {
-                          setSelectedOrderId(o.id);
-                          setInventoryIssueModal(true);
-                        }}
-                      >
-                        <Text style={styles.actionBtnText}>{t('reportInventoryIssue')}</Text>
-                      </TouchableOpacity>
-                    </View>
+                    {o.status === 'handed_to_delivery' ? (
+                      <View style={{ marginTop: 10 }}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#dc2626' }]}
+                          onPress={() => handleUndoHandoff(o.id)}
+                          disabled={actionLoadingId === `undo_${o.id}`}
+                        >
+                          <Text style={styles.actionBtnText}>
+                            {actionLoadingId === `undo_${o.id}` ? '...' : (lang === 'ar' ? '↩️ تراجع عن التسليم للمندوب' : '↩️ Undo Handoff')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#f59e0b', flex: 1, minWidth: 130 }]}
+                          onPress={() => handleInventoryHandoff(o.id)}
+                        >
+                          <Text style={styles.actionBtnText}>{t('confirmHandoff')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#ef4444', flex: 1, minWidth: 130 }]}
+                          onPress={() => {
+                            setSelectedOrderId(o.id);
+                            setInventoryIssueModal(true);
+                          }}
+                        >
+                          <Text style={styles.actionBtnText}>{t('reportInventoryIssue')}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
             )}
 
+            {/* TAB 2: All System Orders with Status Filter */}
             {activeTab === 'tab2' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>⚠️ {t('tabStagingIssues')}</Text>
-                {inventoryIssues.length === 0 ? (
-                  <Text style={[styles.emptyText, theme.textMuted]}>{lang === 'ar' ? 'لا توجد بلاغات مشاكل' : 'No staging issues reported.'}</Text>
-                ) : inventoryIssues.map((o) => (
-                  <TouchableOpacity
-                    key={o.id}
-                    activeOpacity={0.85}
-                    style={[styles.orderCard, theme.cardBg, styles.statCardAccentPurple]}
-                    onPress={() => openOrderAuditModal(o)}
-                  >
-                    <View style={[styles.orderHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
-                      <Text style={[styles.trackingNum, theme.text]}>#{o.tracking_number}</Text>
-                      <Text style={[styles.statusTag, { backgroundColor: '#ef4444' }]}>{tStatus(o.status)}</Text>
-                    </View>
-                    <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                      📍 {dt(o.client_address)}
-                    </Text>
-                    {o.inventory_note ? (
-                      <Text style={[{ color: '#ef4444', fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>
-                        ⚠️ Note: {dt(o.inventory_note)}
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>
+                  📋 {lang === 'ar' ? 'جميع شحنات النظام والتصفيات' : 'All System Orders & Statuses'}
+                </Text>
+
+                {/* Filter Chip Bar */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12 }}>
+                  {[
+                    { id: 'all', label: lang === 'ar' ? 'الكل' : 'All', count: safeOrders.length },
+                    { id: 'pending', label: lang === 'ar' ? 'بانتظار التسليم' : 'Queue (Pending)', count: safeOrders.filter(o => o.status === 'assigned' || o.status === 'notified_inventory' || o.status === 'created').length },
+                    { id: 'handed', label: lang === 'ar' ? 'تم تسليمها للمندوب' : 'Handed Over', count: safeOrders.filter(o => o.status === 'handed_to_delivery').length },
+                    { id: 'issues', label: lang === 'ar' ? 'بلاغات ومشاكل' : 'Issues / Failed', count: safeOrders.filter(o => o.status === 'pickup_failed' || o.status === 'delivery_failed' || o.inventory_note).length },
+                    { id: 'completed', label: lang === 'ar' ? 'مكتملة ومسلمة' : 'Delivered / Done', count: safeOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared' || o.status === 'in_transit').length },
+                  ].map(f => (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={{
+                        backgroundColor: inventoryFilter === f.id ? '#2563eb' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                        paddingVertical: 8,
+                        paddingHorizontal: 14,
+                        borderRadius: 20,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                      onPress={() => setInventoryFilter(f.id)}
+                    >
+                      <Text style={{ color: inventoryFilter === f.id ? '#ffffff' : theme.text.color, fontWeight: '700', fontSize: 13 }}>
+                        {f.label}
                       </Text>
-                    ) : null}
-                    <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                      📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <View style={{
+                        backgroundColor: inventoryFilter === f.id ? 'rgba(255,255,255,0.3)' : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'),
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 10
+                      }}>
+                        <Text style={{ color: inventoryFilter === f.id ? '#ffffff' : theme.text.color, fontSize: 11, fontWeight: '900' }}>
+                          {f.count}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {(() => {
+                  const filtered = safeOrders.filter(o => {
+                    if (inventoryFilter === 'pending') return o.status === 'assigned' || o.status === 'notified_inventory' || o.status === 'created';
+                    if (inventoryFilter === 'handed') return o.status === 'handed_to_delivery';
+                    if (inventoryFilter === 'issues') return o.status === 'pickup_failed' || o.status === 'delivery_failed' || o.inventory_note;
+                    if (inventoryFilter === 'completed') return o.status === 'delivered' || o.status === 'cash_cleared' || o.status === 'in_transit';
+                    return true;
+                  });
+
+                  return filtered.length === 0 ? (
+                    <Text style={[styles.emptyText, theme.textMuted]}>{lang === 'ar' ? 'لا توجد شحنات مطابقة لهذا التصفية' : 'No orders found matching this filter.'}</Text>
+                  ) : filtered.map(o => (
+                    <TouchableOpacity
+                      key={o.id}
+                      activeOpacity={0.85}
+                      style={[styles.orderCard, theme.cardBg, { padding: 14, marginBottom: 10 }]}
+                      onPress={() => openOrderAuditModal(o)}
+                    >
+                      <View style={[styles.orderHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
+                        <Text style={[styles.trackingNum, theme.text, { fontSize: 16 }]}>#{o.tracking_number}</Text>
+                        <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status) }]}>{tStatus(o.status)}</Text>
+                      </View>
+
+                      <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
+                        📍 {dt(o.client_address)}
+                      </Text>
+
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Text style={[{ color: '#059669', fontSize: 14, fontWeight: '900' }, isRTL && styles.rtlText]}>
+                          💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                        </Text>
+                        {o.delivery_guy_name ? (
+                          <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
+                            🚚 Rider: {dt(o.delivery_guy_name)}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      {o.inventory_note ? (
+                        <Text style={[{ color: '#ef4444', fontWeight: '700', marginTop: 4, fontSize: 12 }, isRTL && styles.rtlText]}>
+                          ⚠️ Note: {dt(o.inventory_note)}
+                        </Text>
+                      ) : null}
+
+                      <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
+                        📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                      </Text>
+                    </TouchableOpacity>
+                  ));
+                })()}
               </View>
             )}
           </View>
@@ -2788,7 +3002,23 @@ function MainApp() {
       <Modal visible={createOrderModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
-            <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>{t('dispatchOrderTitle')}</Text>
+            <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
+              {editingOrderId ? (lang === 'ar' ? '✏️ تعديل بيانات الشحنة' : '✏️ Edit Order Details') : t('dispatchOrderTitle')}
+            </Text>
+
+            {/* Field 1: Order Number (Manual input, replaces auto-generated tracking number) */}
+            <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>
+              {lang === 'ar' ? 'رقم الشحنة / الطلب (اختياري)' : 'Order Number / Code (Optional)'}
+            </Text>
+            <TextInput
+              style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
+              placeholder={lang === 'ar' ? 'مثال: 104520' : 'e.g. 104520'}
+              placeholderTextColor="#94a3b8"
+              value={orderNumber}
+              onChangeText={setOrderNumber}
+            />
+
+            {/* Field 2: Delivery Address */}
             <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('clientAddressLabel')}</Text>
             <TextInput
               style={[styles.input, styles.multilineInput, theme.inputBg, theme.text, isRTL && styles.rtlText]}
@@ -2799,6 +3029,8 @@ function MainApp() {
               value={clientAddress}
               onChangeText={setClientAddress}
             />
+
+            {/* Field 3: Amount to Collect */}
             <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('orderAmountLabel')}</Text>
             <TextInput
               style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
@@ -2808,7 +3040,9 @@ function MainApp() {
               value={orderAmount}
               onChangeText={setOrderAmount}
             />
-            <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('roleDeliveryGuy')}</Text>
+
+            {/* Field 4: Mandatory Delivery Driver Selection */}
+            <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('roleDeliveryGuy')} *</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {safeDeliveryGuys.map((g) => (
                 <TouchableOpacity
@@ -2822,10 +3056,11 @@ function MainApp() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
             <TouchableOpacity style={[styles.primaryButton, { marginTop: 16 }]} onPress={handleCreateOrder} disabled={actionLoadingId === 'createOrder'}>
-              {actionLoadingId === 'createOrder' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{t('dispatchOrderBtn')}</Text>}
+              {actionLoadingId === 'createOrder' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{editingOrderId ? (lang === 'ar' ? 'حفظ التعديلات' : 'Save Changes') : t('dispatchOrderBtn')}</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setCreateOrderModal(false)}>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => { setCreateOrderModal(false); setEditingOrderId(null); setOrderNumber(''); setClientAddress(''); setOrderAmount(''); setAssigneeId(''); }}>
               <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>

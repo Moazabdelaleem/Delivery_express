@@ -14,7 +14,7 @@ const VALID_PREDECESSORS = {
 // Create Order (Supervisor)
 exports.createOrder = async (req, res) => {
   try {
-    const { client_name, client_phone, client_address, order_details, order_amount, delivery_guy_id } = req.body;
+    const { tracking_number: customTracking, client_name, client_phone, client_address, order_details, order_amount, delivery_guy_id } = req.body;
 
     if (!client_address || !client_address.trim()) {
       return res.status(400).json({ error: 'Delivery address is required to create an order.' });
@@ -25,7 +25,9 @@ exports.createOrder = async (req, res) => {
     const cAddress = client_address.trim();
     const cDetails = order_details || 'Standard package';
 
-    const tracking_number = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+    const tracking_number = customTracking && customTracking.trim()
+      ? customTracking.trim()
+      : 'ORD-' + Math.floor(100000 + Math.random() * 900000);
     const amount           = parseFloat(order_amount) || 0.00;
     const initialStatus    = delivery_guy_id ? 'assigned' : 'created';
 
@@ -48,6 +50,102 @@ exports.createOrder = async (req, res) => {
   } catch (err) {
     console.error('Error creating order:', err);
     res.status(500).json({ error: 'Server error creating order.' });
+  }
+};
+
+// Edit / Update Order (Supervisor)
+exports.updateOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tracking_number, client_address, order_amount, delivery_guy_id } = req.body;
+
+    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    const currentOrder = orderRes.rows[0];
+    const newTracking  = tracking_number && tracking_number.trim() ? tracking_number.trim() : currentOrder.tracking_number;
+    const newAddress   = client_address && client_address.trim() ? client_address.trim() : currentOrder.client_address;
+    const newAmount    = order_amount !== undefined ? parseFloat(order_amount) : currentOrder.order_amount;
+    const newDriverId  = delivery_guy_id !== undefined ? delivery_guy_id : currentOrder.delivery_guy_id;
+    const newStatus    = newDriverId ? (currentOrder.status === 'created' ? 'assigned' : currentOrder.status) : currentOrder.status;
+
+    const updateRes = await db.query(
+      `UPDATE orders
+       SET tracking_number = $1, client_address = $2, order_amount = $3, delivery_guy_id = $4, status = $5, updated_at = NOW()
+       WHERE id = $6 RETURNING *`,
+      [newTracking, newAddress, newAmount, newDriverId, newStatus, id]
+    );
+
+    await db.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+       VALUES ($1, $2, $3, $4, 'Order details updated by supervisor')`,
+      [id, currentOrder.status, newStatus, req.user.id]
+    );
+
+    res.json({ message: 'Order updated successfully.', order: updateRes.rows[0] });
+  } catch (err) {
+    console.error('Error updating order:', err);
+    res.status(500).json({ error: 'Server error updating order.' });
+  }
+};
+
+// Delete Order (Supervisor)
+exports.deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    await db.query('DELETE FROM order_status_history WHERE order_id = $1', [id]);
+    await db.query('DELETE FROM orders WHERE id = $1', [id]);
+
+    res.json({ message: 'Order deleted successfully.' });
+  } catch (err) {
+    console.error('Error deleting order:', err);
+    res.status(500).json({ error: 'Server error deleting order.' });
+  }
+};
+
+// Reverse / Undo Inventory Handoff (Inventory)
+exports.undoHandoff = async (req, res) => {
+  try {
+    const { order_id } = req.params;
+
+    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [order_id]);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    const order = orderRes.rows[0];
+    if (order.status !== 'handed_to_delivery') {
+      return res.status(400).json({ error: `Cannot undo handoff for an order with status '${order.status}'. Order must be 'handed_to_delivery'.` });
+    }
+
+    const oldStatus = order.status;
+    const newStatus = 'notified_inventory';
+
+    const updateRes = await db.query(
+      `UPDATE orders
+       SET status = $1, inventory_handoff_by = NULL, inventory_note = NULL, updated_at = NOW()
+       WHERE id = $2 RETURNING *`,
+      [newStatus, order_id]
+    );
+
+    await db.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+       VALUES ($1, $2, $3, $4, 'Inventory handoff reversed / undone')`,
+      [order_id, oldStatus, newStatus, req.user.id]
+    );
+
+    res.json({ message: 'Inventory handoff undone successfully.', order: updateRes.rows[0] });
+  } catch (err) {
+    console.error('Error undoing inventory handoff:', err);
+    res.status(500).json({ error: 'Server error undoing inventory handoff.' });
   }
 };
 
