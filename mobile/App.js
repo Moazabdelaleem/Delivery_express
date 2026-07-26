@@ -10,8 +10,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
-  Alert,
-  Vibration
+  Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -450,17 +449,17 @@ function LanguageProvider({ children }) {
   const tStatus = (status) => {
     if (!status) return '';
     const map = {
-      created:            lang === 'ar' ? 'تم الإنشاء' : 'Created',
-      assigned:           lang === 'ar' ? 'تم الإسناد للمندوب' : 'Assigned',
+      created: lang === 'ar' ? 'تم الإنشاء' : 'Created',
+      assigned: lang === 'ar' ? 'تم الإسناد للمندوب' : 'Assigned',
       notified_inventory: lang === 'ar' ? 'تم إخطار المخزن' : 'Inventory Notified',
       handed_to_delivery: lang === 'ar' ? 'استلمها المندوب من المخزن' : 'Picked Up',
-      pickup_failed:      lang === 'ar' ? 'فشل الاستلام من المخزن ⚠️' : 'Pickup Failed ⚠️',
-      in_transit:         lang === 'ar' ? 'جاري التوصيل بالطريق' : 'In Transit',
-      delivered:          lang === 'ar' ? 'تم التسليم للعميل ✅' : 'Delivered ✅',
-      delivery_failed:    lang === 'ar' ? 'فشل التسليم للعميل ❌' : 'Delivery Failed ❌',
-      returned_to_company:lang === 'ar' ? 'مرتجع للشركة' : 'Returned',
-      cash_cleared:       lang === 'ar' ? 'تم تسوية النقدية 💰' : 'Cash Cleared 💰',
-      failed:             lang === 'ar' ? 'فشل التسليم' : 'Failed',
+      pickup_failed: lang === 'ar' ? 'فشل الاستلام من المخزن ⚠️' : 'Pickup Failed ⚠️',
+      in_transit: lang === 'ar' ? 'جاري التوصيل بالطريق' : 'In Transit',
+      delivered: lang === 'ar' ? 'تم التسليم للعميل ✅' : 'Delivered ✅',
+      delivery_failed: lang === 'ar' ? 'فشل التسليم للعميل ❌' : 'Delivery Failed ❌',
+      returned_to_company: lang === 'ar' ? 'مرتجع للشركة' : 'Returned',
+      cash_cleared: lang === 'ar' ? 'تم تسوية النقدية 💰' : 'Cash Cleared 💰',
+      failed: lang === 'ar' ? 'فشل التسليم' : 'Failed',
     };
     return map[status] || status;
   };
@@ -566,9 +565,9 @@ function MainApp() {
   const getDriverWallet = (driverKey) => {
     if (!driverKey) return { collection_balance: 0, pocket_balance: 50, total_topped_up: 50, total_spent: 0 };
     const key = String(driverKey).toLowerCase();
-    const entry = sharedWalletsMap[key] || Object.values(sharedWalletsMap).find(w => 
-      String(w.id || '').toLowerCase() === key || 
-      String(w.delivery_guy_id || '').toLowerCase() === key || 
+    const entry = sharedWalletsMap[key] || Object.values(sharedWalletsMap).find(w =>
+      String(w.id || '').toLowerCase() === key ||
+      String(w.delivery_guy_id || '').toLowerCase() === key ||
       String(w.username || '').toLowerCase() === key ||
       String(w.name || w.delivery_guy_name || '').toLowerCase() === key
     );
@@ -585,7 +584,7 @@ function MainApp() {
     setSharedWalletsMap(prev => {
       const nextMap = { ...prev };
       const keys = Array.isArray(driverKeysArray) ? driverKeysArray : [driverKeysArray];
-      
+
       let baseEntry = null;
       for (const k of keys) {
         if (!k) continue;
@@ -598,8 +597,8 @@ function MainApp() {
 
       const curColl = baseEntry?.collection_balance !== undefined ? parseFloat(baseEntry.collection_balance) : 0.00;
       const curPock = baseEntry?.pocket_balance !== undefined ? parseFloat(baseEntry.pocket_balance) : 50.00;
-      const curTop  = baseEntry?.total_topped_up !== undefined ? parseFloat(baseEntry.total_topped_up) : 50.00;
-      const curSpent= baseEntry?.total_spent !== undefined ? parseFloat(baseEntry.total_spent) : 0.00;
+      const curTop = baseEntry?.total_topped_up !== undefined ? parseFloat(baseEntry.total_topped_up) : 50.00;
+      const curSpent = baseEntry?.total_spent !== undefined ? parseFloat(baseEntry.total_spent) : 0.00;
 
       const updatedVal = {
         collection_balance: collectionOverride !== null ? parseFloat(collectionOverride) : curColl,
@@ -769,7 +768,6 @@ function MainApp() {
 
     socket.on('order_assigned', (data) => {
       if (user.role === 'delivery_guy' && data.delivery_guy_id === user.id) {
-        try { Vibration.vibrate([0, 500, 200, 500]); } catch (e) {}
         showToast(lang === 'ar' ? '🚀 تم إسناد شحنة جديدة لك!' : '🚀 New order assigned to you!');
       }
       fetchData();
@@ -1057,7 +1055,7 @@ function MainApp() {
       const data = await res.json();
       if (res.ok) {
         showToast(`✅ ${t('statusUpdated')} ${tStatus(newStatus)}`);
-        
+
         if (newStatus === 'delivered' && user) {
           const cashAmt = parseFloat(cash || 0);
           updateSharedWallet([user.id, user.username, user.name], 0, 0, getDriverWallet(user.id).collection_balance + cashAmt);
@@ -1236,7 +1234,7 @@ function MainApp() {
       const data = await res.json();
       if (res.ok) {
         showToast(`💳 ${lang === 'ar' ? 'تم شحن' : 'Topped up'} $${numericAmt.toFixed(2)} ${lang === 'ar' ? 'للمندوب' : 'for'} ${dt(driverName)}`);
-        
+
         // INSTANTLY UPDATE THE SINGLE GLOBAL WALLET OBJECT X FOR ALL SCREENS
         updateSharedWallet([driverId, driverName, driverUser], numericAmt, 0);
 
@@ -1277,7 +1275,7 @@ function MainApp() {
       const data = await res.json();
       if (res.ok) {
         showToast(`⛽ ${t('expenseSuccess')} $${parseFloat(data.new_pocket_balance || 0).toFixed(2)}`);
-        
+
         // INSTANTLY UPDATE THE SINGLE GLOBAL WALLET OBJECT X FOR ALL SCREENS
         if (user) {
           updateSharedWallet([user.id, user.username, user.name], 0, expAmt);
@@ -1497,7 +1495,7 @@ function MainApp() {
       await AsyncStorage.removeItem('@remember_me');
       await AsyncStorage.removeItem('@auth_token');
       await AsyncStorage.removeItem('@auth_user');
-    } catch (e) {}
+    } catch (e) { }
     setUser(null);
     setToken(null);
     setOrders([]);
@@ -1915,8 +1913,8 @@ function MainApp() {
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                   <View style={[styles.statusDot, { backgroundColor: driverOnline ? '#10b981' : '#cbd5e1' }]} />
                   <Text style={[styles.driverStatusText, isRTL && styles.rtlText, { fontWeight: '800' }]} numberOfLines={1}>
-                    {driverOnline 
-                      ? (activeOrders.length > 0 
+                    {driverOnline
+                      ? (activeOrders.length > 0
                         ? (lang === 'ar' ? `📦 الشحنة الحالية: ${tStatus(activeOrders[0].status)}` : `📦 Active Order: ${tStatus(activeOrders[0].status)}`)
                         : (lang === 'ar' ? '✅ جاهز للتوصيل — لا توجد شحنات نشطة' : '✅ Ready — No Active Deliveries'))
                       : t('youAreOffline')}
@@ -2540,10 +2538,10 @@ function MainApp() {
 
                           <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: isRTL ? 'flex-end' : 'flex-start', marginBottom: 6 }}>
                             <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
-                              {collectionBal > 0 
+                              {collectionBal > 0
                                 ? (driverDeliveredOrders.length > 0
-                                    ? (lang === 'ar' ? `👇 ${driverDeliveredOrders.length} شحنات معلقة (انقر للعرض)` : `👇 ${driverDeliveredOrders.length} Pending (Tap to view)`)
-                                    : (lang === 'ar' ? '💵 نقدية بحوزة المندوب' : '💵 Cash Held'))
+                                  ? (lang === 'ar' ? `👇 ${driverDeliveredOrders.length} شحنات معلقة (انقر للعرض)` : `👇 ${driverDeliveredOrders.length} Pending (Tap to view)`)
+                                  : (lang === 'ar' ? '💵 نقدية بحوزة المندوب' : '💵 Cash Held'))
                                 : (lang === 'ar' ? '✅ مسواة بالكامل' : '✅ Fully Settled')}
                             </Text>
                           </View>
@@ -2581,10 +2579,10 @@ function MainApp() {
 
                           <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: isRTL ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
                             <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
-                              {pocketBal > 0 
-                                ? (lang === 'ar' ? '🟢 عهدة متاحة' : '🟢 Available') 
-                                : (pocketBal < 0 
-                                  ? (lang === 'ar' ? '⚠️ عجز بالعهدة' : '⚠️ Deficit') 
+                              {pocketBal > 0
+                                ? (lang === 'ar' ? '🟢 عهدة متاحة' : '🟢 Available')
+                                : (pocketBal < 0
+                                  ? (lang === 'ar' ? '⚠️ عجز بالعهدة' : '⚠️ Deficit')
                                   : (lang === 'ar' ? '⚪ رصيد صفر' : '⚪ Zero'))}
                             </Text>
                           </View>
@@ -2760,7 +2758,7 @@ function MainApp() {
 
                 {/* Department Quick Summaries */}
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>🏢 {t('execDepartmentOverviews')}</Text>
-                
+
                 <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentBlue]} onPress={() => setActiveTab('tab2')}>
                   <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execSupervisorDeptTitle')}</Text>
                   <Text style={[theme.textMuted, { fontSize: 12, marginTop: 4 }, isRTL && styles.rtlText]}>
@@ -3217,7 +3215,7 @@ function MainApp() {
                   const driverId = selectedDriverForStats.id || selectedDriverForStats.delivery_guy_id;
                   const totalAssigned = safeOrders.filter(o => o.delivery_guy_id === driverId).length;
                   const completedCount = safeOrders.filter(o => o.delivery_guy_id === driverId && (o.status === 'delivered' || o.status === 'cash_cleared')).length;
-                  
+
                   const driverWallet = getDriverWallet(driverId || selectedDriverForStats.username);
                   const colBal = driverWallet.collection_balance;
                   const pockBal = driverWallet.pocket_balance;
