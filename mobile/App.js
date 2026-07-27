@@ -21,11 +21,11 @@ const DEFAULT_HOST = '192.168.1.15';
 
 // 1-Tap Quick Login Preset Accounts
 const DEMO_ACCOUNTS = [
-  { role: 'delivery_guy', name: '🚚 Sami', username: 'sami_delivery', color: '#10b981' },
+  { role: 'delivery_guy', name: ' Sami', username: 'sami_delivery', color: '#10b981' },
   { role: 'supervisor', name: '👔 Kareem', username: 'kareem_supervisor', color: '#3b82f6' },
-  { role: 'inventory', name: '📦 Hassan', username: 'hassan_inventory', color: '#f59e0b' },
-  { role: 'finance', name: '💰 Mona', username: 'mona_finance', color: '#8b5cf6' },
-  { role: 'manager', name: '📊 Tarek', username: 'tarek_manager', color: '#ec4899' },
+  { role: 'inventory', name: 'Hassan', username: 'hassan_inventory', color: '#f59e0b' },
+  { role: 'finance', name: 'Mona', username: 'mona_finance', color: '#8b5cf6' },
+  { role: 'manager', name: 'Tarek', username: 'tarek_manager', color: '#ec4899' },
 ];
 
 // ==========================================
@@ -94,15 +94,15 @@ const translations = {
     execSupervisorDeptTitle: "👔 Supervisor & Dispatch Operations",
     execActiveOrders: "Active Orders",
     execInTransit: "In Transit",
-    execTapOpsBoard: "Tap to inspect Operations Board ➔",
-    execWarehouseDeptTitle: "📦 Warehouse & Staging Queue",
+    execTapOpsBoard: "Tap to inspect Operations Board",
+    execWarehouseDeptTitle: "Warehouse & Staging Queue",
     execPendingHandoff: "Packages Pending Handoff",
     execReportedIssues: "Reported Issues",
-    execTapWarehouseQueue: "Tap to inspect Warehouse Queue ➔",
-    execFinanceDeptTitle: "💰 Finance & Driver Wallets",
+    execTapWarehouseQueue: "Tap to inspect Warehouse Queue",
+    execFinanceDeptTitle: "Finance & Driver Wallets",
     execDriversMonitored: "Drivers Monitored",
     execCashSettled: "Cash Settled",
-    execTapFleetWallets: "Tap to inspect Fleet Wallets ➔",
+    execTapFleetWallets: "Tap to inspect Fleet Wallets",
     execAllOpsTitle: "All System Operations & Orders (Read-Only)",
     execFleetRosterTitle: "Fleet Roster & Driver Wallets (Read-Only)",
     execFleetExpensesTitle: "Fleet Expenses Breakdown (Read-Only)",
@@ -124,22 +124,22 @@ const translations = {
     confirmPasswordPlaceholder: "Re-enter your password",
     namePlaceholder: "e.g. Sami Ahmed",
     rememberMeLabel: "Remember me on this device",
-    quickLoginsTitle: "⚡ Quick Demo Accounts (Tap to Switch Role):",
+    quickLoginsTitle: "Quick Demo Accounts (Tap to Switch Role):",
 
     signInBtn: "Sign In to Dashboard",
     registerBtn: "Create My Account",
-    dontHaveAccountLink: "✨ New User? Tap here to create an account",
+    dontHaveAccountLink: "New User? Tap here to create an account",
     alreadyHaveAccountLink: "Already have an account? Tap here to sign in",
     logout: "Logout",
-    lightMode: "☀️ Light",
-    darkMode: "🌙 Dark",
+    lightMode: "Light",
+    darkMode: "Dark",
     cancel: "Cancel",
 
-    roleDeliveryGuy: "🚚 Delivery Guy",
+    roleDeliveryGuy: " Delivery Guy",
     roleSupervisor: "👔 Supervisor",
-    roleInventory: "📦 Inventory",
-    roleFinance: "💰 Finance",
-    roleManager: "📊 Exec. Manager",
+    roleInventory: "Inventory",
+    roleFinance: "Finance",
+    roleManager: "Exec. Manager",
     delivery_guy: "Delivery Guy",
     supervisor: "Supervisor",
     inventory: "Inventory Staff",
@@ -151,46 +151,46 @@ const translations = {
     cashLiability: "Cash liability held",
     fuelExpenses: "Fuel & Expenses",
 
-    logExpenseBtn: "⛽ Log Fuel / Pocket Expense",
+    logExpenseBtn: "Log Fuel / Pocket Expense",
     assignedDeliveries: " My Assigned Deliveries",
     noDeliveries: "No active deliveries assigned yet.",
     noHistory: "No past order history found.",
     amountToCollect: "Price / Collect",
-    pickupFromWarehouse: "🏭 Picked Up from Warehouse",
-    startTransit: "🚚 Start Transit",
-    deliveredCollect: "✅ Delivered & Collect Cash",
-    deliveryFailed: "❌ Delivery Failed",
-    goOnline: "🟢 Go Online",
+    pickupFromWarehouse: "Picked Up from Warehouse",
+    startTransit: " Start Transit",
+    deliveredCollect: "Delivered & Collect Cash",
+    deliveryFailed: "Delivery Failed",
+    goOnline: "Go Online",
     goOffline: "⭕ Go Offline",
     youAreOnline: "You are Online — Ready for deliveries",
     youAreOffline: "You are Offline",
     driverStatusLabel: "Driver Status",
 
-    dispatchOrder: "➕ Dispatch New Order",
-    allOrders: "📋 All Active Orders",
+    dispatchOrder: "Dispatch New Order",
+    allOrders: "All Active Orders",
     statusLabel: "Status",
     orderAmountLabel: "Amount to Collect ($) *",
 
-    warehouseQueue: "📦 Warehouse Package Queue",
-    confirmHandoff: "📦 Confirm Warehouse Handoff",
-    reportInventoryIssue: "⚠️ Report Pickup Issue",
-    inventoryIssueTitle: "⚠️ Warehouse Staging Issue",
+    warehouseQueue: "Warehouse Package Queue",
+    confirmHandoff: "Confirm Warehouse Handoff",
+    reportInventoryIssue: "Report Pickup Issue",
+    inventoryIssueTitle: "Warehouse Staging Issue",
     reasonItemDamaged: "Package Damaged During Staging",
     reasonItemMissing: "Item Missing From Bay Shelf",
     reasonDriverDeclined: "Driver Declined Pickup",
     confirmIssueBtn: "Report Issue & Update Queue",
 
-    clearCashPullout: "💵 Clear Cash Pullout",
-    topUpPocket: "➕ Top Up Pocket Allowance",
-    pulloutModalTitle: "💵 Collection Cash Settlement",
-    topupModalTitle: "➕ Pocket Allowance Top-Up",
+    clearCashPullout: "Clear Cash Pullout",
+    topUpPocket: "Top Up Pocket Allowance",
+    pulloutModalTitle: "Collection Cash Settlement",
+    topupModalTitle: "Pocket Allowance Top-Up",
     amountToPullLabel: "Pullout Amount ($)",
     topupAmountLabel: "Top-Up Amount ($)",
     notesLabel: "Audit Notes / Reference",
     confirmPulloutBtn: "Confirm Cash Settlement",
     confirmTopupBtn: "Confirm Top-Up Deposit",
 
-    deliveryFailureTitle: "❌ Delivery Failure Reason",
+    deliveryFailureTitle: "Delivery Failure Reason",
     selectFailureReason: "Select or type reason for failure:",
     reasonClientUnreachable: "Client Unreachable",
     reasonWrongAddress: "Incorrect / Invalid Address",
@@ -198,37 +198,37 @@ const translations = {
     reasonClientCancelled: "Client Cancelled On Arrival",
     confirmFailureBtn: "Confirm Delivery Failure",
 
-    deliveryRoster: "👥 Delivery Roster & Wallets",
-    pendingApprovals: "🛡️ Pending Executive Approvals",
+    deliveryRoster: "Delivery Roster & Wallets",
+    pendingApprovals: "Pending Executive Approvals",
     noPending: "No pending executive manager requests.",
-    approveAccount: "✅ Approve Account",
-    rejectAccount: "❌ Reject Request",
+    approveAccount: "Approve Account",
+    rejectAccount: "Reject Request",
     rejectConfirmTitle: "Reject Account",
     rejectConfirmBody: "Are you sure you want to reject and remove this manager request?",
-    wipeSystem: "🧹 Wipe Mock Data & Reset System",
+    wipeSystem: "Wipe Mock Data & Reset System",
 
-    logPocketExpenseTitle: "⛽ Log Pocket Expense",
+    logPocketExpenseTitle: "Log Pocket Expense",
     amountSpentLabel: "Amount Spent ($) *",
     mandatoryReasonLabel: "Mandatory Reason *",
     amountPlaceholder: "e.g. 25.50",
     reasonPlaceholder: "e.g. Fuel refill for motorcycle",
     submitExpense: "Submit Expense",
 
-    dispatchOrderTitle: "➕ Dispatch New Order",
+    dispatchOrderTitle: "Dispatch New Order",
     clientAddressLabel: "Delivery Address *",
     orderAmountPlaceholder: "e.g. 150.00",
     dispatchOrderBtn: "Dispatch Order",
     clientAddressPlaceholder: "Enter delivery address",
 
-    serverIpLabel: "📡 Server IP:",
+    serverIpLabel: "Server IP:",
 
     validationEnterAll: "Please enter your username and password",
     validationRegRequired: "Username, password, full name and matching passwords are required",
     passwordMismatch: "Passwords do not match. Please try again.",
-    alertWipeTitle: "⚠️ Wipe System Data",
+    alertWipeTitle: "Wipe System Data",
     alertWipeBody: "Are you sure you want to wipe all test orders and expenses? This cannot be undone.",
     alertWipeConfirm: "Wipe Clean",
-    alertWipedTitle: "✅ Wiped Clean",
+    alertWipedTitle: "Wiped Clean",
     alertWipedBody: "System has been reset for production use.",
     alertSuccess: "Success",
     alertError: "Error",
@@ -282,15 +282,15 @@ const translations = {
     execSupervisorDeptTitle: "👔 قسم الإشراف والعمليات",
     execActiveOrders: "شحنات نشطة",
     execInTransit: "بالطريق",
-    execTapOpsBoard: "اضغط لاستعراض شاشة العمليات ➔",
-    execWarehouseDeptTitle: "📦 قسم المخزن والتجهيز",
+    execTapOpsBoard: "اضغط لاستعراض شاشة العمليات",
+    execWarehouseDeptTitle: "قسم المخزن والتجهيز",
     execPendingHandoff: "شحنات بانتظار التسليم للمندوب",
     execReportedIssues: "بلاغات مشاكل بالمخزن",
-    execTapWarehouseQueue: "اضغط لاستعراض قائمة المخزن ➔",
-    execFinanceDeptTitle: "💰 قسم المالية ومحافظ المندوبين",
+    execTapWarehouseQueue: "اضغط لاستعراض قائمة المخزن",
+    execFinanceDeptTitle: "قسم المالية ومحافظ المندوبين",
     execDriversMonitored: "مندوبين تحت الرقابة",
     execCashSettled: "نقدية محصلة",
-    execTapFleetWallets: "اضغط لاستعراض محافظ المندوبين ➔",
+    execTapFleetWallets: "اضغط لاستعراض محافظ المندوبين",
     execAllOpsTitle: "سجل العمليات والشحنات بالكامل (قراءة فقط)",
     execFleetRosterTitle: "كشف المندوبين والمحافظ (قراءة فقط)",
     execFleetExpensesTitle: "كشف مصاريف المندوبين (قراءة فقط)",
@@ -312,22 +312,22 @@ const translations = {
     confirmPasswordPlaceholder: "أعد إدخال كلمة المرور",
     namePlaceholder: "مثال: سامي أحمد",
     rememberMeLabel: "تذكرني على هذا الجهاز (البقاء متصلاً)",
-    quickLoginsTitle: "⚡ دخول سريع لدور العمل (اضغط للتجربة):",
+    quickLoginsTitle: "دخول سريع لدور العمل (اضغط للتجربة):",
 
     signInBtn: "تسجيل الدخول للوحة التحكم",
     registerBtn: "إنشاء حسابي الآن",
-    dontHaveAccountLink: "✨ مستخدم جديد؟ اضغط هنا لإنشاء حساب",
+    dontHaveAccountLink: "مستخدم جديد؟ اضغط هنا لإنشاء حساب",
     alreadyHaveAccountLink: "لديك حساب؟ اضغط هنا لتسجيل الدخول",
     logout: "تسجيل الخروج",
-    lightMode: "☀️ الوضع الفاتح",
-    darkMode: "🌙 الوضع الداكن",
+    lightMode: "الوضع الفاتح",
+    darkMode: "الوضع الداكن",
     cancel: "إلغاء",
 
-    roleDeliveryGuy: "🚚 مندوب التوصيل",
+    roleDeliveryGuy: " مندوب التوصيل",
     roleSupervisor: "👔 المشرف",
-    roleInventory: "📦 المخزن",
-    roleFinance: "💰 المالية",
-    roleManager: "📊 مدير تنفيذي",
+    roleInventory: "المخزن",
+    roleFinance: "المالية",
+    roleManager: "مدير تنفيذي",
     delivery_guy: "مندوب التوصيل",
     supervisor: "مشرف العمليات",
     inventory: "مسؤول المخزن",
@@ -339,46 +339,46 @@ const translations = {
     cashLiability: "إجمالي المبالغ المحصلة",
     fuelExpenses: "مصاريف الوقود والصيانة",
 
-    logExpenseBtn: "⛽ تسجيل مصروف عهدة (بنزين/صيانة)",
+    logExpenseBtn: "تسجيل مصروف عهدة (بنزين/صيانة)",
     assignedDeliveries: "الشحنات المسندة إليّ اليوم",
     noDeliveries: "لا توجد شحنات مسندة حالياً.",
     noHistory: "لا يوجد سجل شحنات سابقة.",
     amountToCollect: "المبلغ المطلوب تحصيله",
-    pickupFromWarehouse: "🏭 استلمت الشحنة من المخزن",
-    startTransit: "🚚 بدء خط السير والتوصيل",
-    deliveredCollect: "✅ تم التسليم وتحصيل المبلغ",
-    deliveryFailed: "❌ فشل التسليم للعميل",
-    goOnline: "🟢 الدخول للعمل",
+    pickupFromWarehouse: "استلمت الشحنة من المخزن",
+    startTransit: " بدء خط السير والتوصيل",
+    deliveredCollect: "تم التسليم وتحصيل المبلغ",
+    deliveryFailed: "فشل التسليم للعميل",
+    goOnline: "الدخول للعمل",
     goOffline: "⭕ الخروج من العمل",
     youAreOnline: "أنت متاح — جاهز لاستقبال الشحنات",
     youAreOffline: "أنت غير متاح الآن",
     driverStatusLabel: "حالة المندوب",
 
-    dispatchOrder: "➕ إضافة وإسناد شحنة جديدة",
-    allOrders: "📋 سجل الشحنات النشطة",
+    dispatchOrder: "إضافة وإسناد شحنة جديدة",
+    allOrders: "سجل الشحنات النشطة",
     statusLabel: "الحالة",
     orderAmountLabel: "مبلغ التحصيل ($) *",
 
-    warehouseQueue: "📦 قائمة الشحنات بالمخزن",
-    confirmHandoff: "📦 تأكيد تسليم الشحنة للمندوب",
-    reportInventoryIssue: "⚠️ الإبلاغ عن مشكلة استلام",
-    inventoryIssueTitle: "⚠️ مشكلة في تجهيز الشحنة بالمخزن",
+    warehouseQueue: "قائمة الشحنات بالمخزن",
+    confirmHandoff: "تأكيد تسليم الشحنة للمندوب",
+    reportInventoryIssue: "الإبلاغ عن مشكلة استلام",
+    inventoryIssueTitle: "مشكلة في تجهيز الشحنة بالمخزن",
     reasonItemDamaged: "تلف المنتجات أثناء التجهيز",
     reasonItemMissing: "المنتج غير موجود على الرف",
     reasonDriverDeclined: "المندوب رفض استلام الشحنة",
     confirmIssueBtn: "إثبات المشكلة وتحديث القائمة",
 
-    clearCashPullout: "💵 تسوية وتفريغ النقدية",
-    topUpPocket: "➕ شحن عهدة المصاريف",
-    pulloutModalTitle: "💵 توريد وتحصيل المبالغ النقدية",
-    topupModalTitle: "➕ شحن عهدة مصاريف للمندوب",
+    clearCashPullout: "تسوية وتفريغ النقدية",
+    topUpPocket: "شحن عهدة المصاريف",
+    pulloutModalTitle: "توريد وتحصيل المبالغ النقدية",
+    topupModalTitle: "شحن عهدة مصاريف للمندوب",
     amountToPullLabel: "المبلغ المورد للمكتب ($)",
     topupAmountLabel: "مبلغ الشحن ($)",
     notesLabel: "ملاحظات السند والتوريد",
     confirmPulloutBtn: "تأكيد توريد النقدية",
     confirmTopupBtn: "تأكيد شحن العهدة",
 
-    deliveryFailureTitle: "❌ سبب عدم تسليم الشحنة",
+    deliveryFailureTitle: "سبب عدم تسليم الشحنة",
     selectFailureReason: "اختر أو اكتب سبب عدم التسليم:",
     reasonClientUnreachable: "العميل لا يرد / الهاتف مغلق",
     reasonWrongAddress: "العنوان غير صحيح / خطأ في الموقع",
@@ -386,37 +386,37 @@ const translations = {
     reasonClientCancelled: "العميل ألغى الطلب عند الوصول",
     confirmFailureBtn: "تأكيد إثبات عدم التسليم",
 
-    deliveryRoster: "👥 كشف المندوبين والمافظ",
-    pendingApprovals: "🛡️ طلبات الموافقة للمدراء التنفيذيين",
+    deliveryRoster: "كشف المندوبين والمافظ",
+    pendingApprovals: "طلبات الموافقة للمدراء التنفيذيين",
     noPending: "لا توجد طلبات معلقة حالياً.",
-    approveAccount: "✅ الموافقة",
-    rejectAccount: "❌ رفض الطلب",
+    approveAccount: "الموافقة",
+    rejectAccount: "رفض الطلب",
     rejectConfirmTitle: "رفض الحساب",
     rejectConfirmBody: "هل أنت متأكد من رفض وإزالة طلب هذا المدير؟",
-    wipeSystem: "🧹 مسح البيانات التجريبية وإعادة الضبط",
+    wipeSystem: "مسح البيانات التجريبية وإعادة الضبط",
 
-    logPocketExpenseTitle: "⛽ تسجيل مصروف عهدة",
+    logPocketExpenseTitle: "تسجيل مصروف عهدة",
     amountSpentLabel: "المبلغ المصروف ($) *",
     mandatoryReasonLabel: "سبب الصرف (إجباري) *",
     amountPlaceholder: "مثال: ٢٥.٥٠",
     reasonPlaceholder: "مثال: تموين بنزين للموتوسيكل",
     submitExpense: "تسجيل المصروف",
 
-    dispatchOrderTitle: "➕ إضافة وإسناد شحنة جديدة",
+    dispatchOrderTitle: "إضافة وإسناد شحنة جديدة",
     clientAddressLabel: "عنوان التوصيل *",
     orderAmountPlaceholder: "مثال: ١٥٠.٠٠",
     dispatchOrderBtn: "إسناد الشحنة فوراً",
     clientAddressPlaceholder: "أدخل عنوان التوصيل الفعلي",
 
-    serverIpLabel: "📡 IP السيرفر:",
+    serverIpLabel: "IP السيرفر:",
 
     validationEnterAll: "يرجى إدخال اسم المستخدم وكلمة المرور",
     validationRegRequired: "اسم المستخدم والاسم الكامل وكلمة المرور وتأكيدها كلها مطلوبة",
     passwordMismatch: "كلمتا المرور غير متطابقتين. يرجى المحاولة مجدداً.",
-    alertWipeTitle: "⚠️ مسح بيانات النظام",
+    alertWipeTitle: "مسح بيانات النظام",
     alertWipeBody: "هل أنت متأكد من مسح جميع الطلبات والبيانات التجريبية؟ لا يمكن التراجع عن هذا الإجراء.",
     alertWipeConfirm: "مسح الكل",
-    alertWipedTitle: "✅ تمت إعادة الضبط",
+    alertWipedTitle: "تمت إعادة الضبط",
     alertWipedBody: "تمت إعادة ضبط النظام للاستخدام الفعلي.",
     alertSuccess: "نجح الإجراء",
     alertError: "حدث خطأ",
@@ -454,12 +454,12 @@ function LanguageProvider({ children }) {
       assigned: lang === 'ar' ? 'تم الإسناد للمندوب' : 'Assigned',
       notified_inventory: lang === 'ar' ? 'تم إخطار المخزن' : 'Inventory Notified',
       handed_to_delivery: lang === 'ar' ? 'استلمها المندوب من المخزن' : 'Picked Up',
-      pickup_failed: lang === 'ar' ? 'فشل الاستلام من المخزن ⚠️' : 'Pickup Failed ⚠️',
+      pickup_failed: lang === 'ar' ? 'فشل الاستلام من المخزن' : 'Pickup Failed',
       in_transit: lang === 'ar' ? 'جاري التوصيل بالطريق' : 'In Transit',
-      delivered: lang === 'ar' ? 'تم التسليم للعميل ✅' : 'Delivered ✅',
-      delivery_failed: lang === 'ar' ? 'فشل التسليم للعميل ❌' : 'Delivery Failed ❌',
+      delivered: lang === 'ar' ? 'تم التسليم للعميل' : 'Delivered',
+      delivery_failed: lang === 'ar' ? 'فشل التسليم للعميل' : 'Delivery Failed',
       returned_to_company: lang === 'ar' ? 'مرتجع للشركة' : 'Returned',
-      cash_cleared: lang === 'ar' ? 'تم تسوية النقدية 💰' : 'Cash Cleared 💰',
+      cash_cleared: lang === 'ar' ? 'تم تسوية النقدية' : 'Cash Cleared',
       failed: lang === 'ar' ? 'فشل التسليم' : 'Failed',
     };
     return map[status] || status;
@@ -769,7 +769,7 @@ function MainApp() {
 
     socket.on('order_assigned', (data) => {
       if (user.role === 'delivery_guy' && data.delivery_guy_id === user.id) {
-        showToast(lang === 'ar' ? '🚀 تم إسناد شحنة جديدة لك!' : '🚀 New order assigned to you!');
+        showToast(lang === 'ar' ? 'تم إسناد شحنة جديدة لك!' : 'New order assigned to you!');
       }
       fetchData();
     });
@@ -869,10 +869,10 @@ function MainApp() {
             await AsyncStorage.setItem('@auth_user', JSON.stringify(data.user));
           }
 
-          showToast(lang === 'ar' ? `🎉 أهلاً بك ${data.user.name}! تم تسجيل الحساب ودخولك بنجاح` : `🎉 Welcome ${data.user.name}! Registered & logged in successfully`);
+          showToast(lang === 'ar' ? `أهلاً بك ${data.user.name}! تم تسجيل الحساب ودخولك بنجاح` : `Welcome ${data.user.name}! Registered & logged in successfully`);
         } else {
           setActiveAuthTab('login');
-          showToast(lang === 'ar' ? '✅ تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول' : '✅ Account registered successfully! Please log in');
+          showToast(lang === 'ar' ? 'تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول' : 'Account registered successfully! Please log in');
         }
       }
     } catch (err) {
@@ -1030,7 +1030,7 @@ function MainApp() {
           await AsyncStorage.setItem('@auth_user', JSON.stringify(updatedUser));
         }
 
-        showToast(newStatus === 'online' ? (lang === 'ar' ? '🟢 أنت الآن متصل — جاهز للتوصيل' : '🟢 You are now Online — Ready for deliveries') : (lang === 'ar' ? '🔴 أنت الآن غير متصل' : '🔴 You are now Offline'));
+        showToast(newStatus === 'online' ? (lang === 'ar' ? 'أنت الآن متصل — جاهز للتوصيل' : 'You are now Online — Ready for deliveries') : (lang === 'ar' ? 'أنت الآن غير متصل' : 'You are now Offline'));
         fetchData();
       } else {
         Alert.alert(t('alertError'), data.error || 'Status toggle failed');
@@ -1055,7 +1055,7 @@ function MainApp() {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`✅ ${t('statusUpdated')} ${tStatus(newStatus)}`);
+        showToast(`${t('statusUpdated')} ${tStatus(newStatus)}`);
 
         if (newStatus === 'delivered' && user) {
           const cashAmt = parseFloat(cash || 0);
@@ -1100,7 +1100,7 @@ function MainApp() {
         body: JSON.stringify({ handed_over: false, note: inventoryIssueReason.trim() })
       });
       if (res.ok) {
-        showToast(lang === 'ar' ? '⚠️ تم تسجيل البلاغ بنجاح' : '⚠️ Staging issue recorded successfully');
+        showToast(lang === 'ar' ? 'تم تسجيل البلاغ بنجاح' : 'Staging issue recorded successfully');
         fetchData();
       } else {
         const data = await res.json();
@@ -1152,7 +1152,7 @@ function MainApp() {
               });
               const data = await res.json();
               if (res.ok) {
-                showToast(lang === 'ar' ? `💰 تم توريد $${fullAmount.toFixed(2)} بنجاح!` : `💰 Cleared full $${fullAmount.toFixed(2)} cash balance!`);
+                showToast(lang === 'ar' ? `تم توريد $${fullAmount.toFixed(2)} بنجاح!` : `Cleared full $${fullAmount.toFixed(2)} cash balance!`);
                 updateSharedWallet([driverId, driverName, driver.username], 0, 0, 0.00);
                 fetchData();
               } else {
@@ -1193,7 +1193,7 @@ function MainApp() {
               });
               const data = await res.json();
               if (res.ok) {
-                showToast(lang === 'ar' ? `💰 تم تسوية $${numericAmt.toFixed(2)} للشحنة #${trackingNumber}` : `💰 Cash of $${numericAmt.toFixed(2)} settled for #${trackingNumber}`);
+                showToast(lang === 'ar' ? `تم تسوية $${numericAmt.toFixed(2)} للشحنة #${trackingNumber}` : `Cash of $${numericAmt.toFixed(2)} settled for #${trackingNumber}`);
                 fetchData();
               } else {
                 Alert.alert(t('alertError'), data.error || 'Failed to clear order cash');
@@ -1234,7 +1234,7 @@ function MainApp() {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`💳 ${lang === 'ar' ? 'تم شحن' : 'Topped up'} $${numericAmt.toFixed(2)} ${lang === 'ar' ? 'للمندوب' : 'for'} ${dt(driverName)}`);
+        showToast(`${lang === 'ar' ? 'تم شحن' : 'Topped up'} $${numericAmt.toFixed(2)} ${lang === 'ar' ? 'للمندوب' : 'for'} ${dt(driverName)}`);
 
         // INSTANTLY UPDATE THE SINGLE GLOBAL WALLET OBJECT X FOR ALL SCREENS
         updateSharedWallet([driverId, driverName, driverUser], numericAmt, 0);
@@ -1275,7 +1275,7 @@ function MainApp() {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`⛽ ${t('expenseSuccess')} $${parseFloat(data.new_pocket_balance || 0).toFixed(2)}`);
+        showToast(`${t('expenseSuccess')} $${parseFloat(data.new_pocket_balance || 0).toFixed(2)}`);
 
         // INSTANTLY UPDATE THE SINGLE GLOBAL WALLET OBJECT X FOR ALL SCREENS
         if (user) {
@@ -1308,7 +1308,7 @@ function MainApp() {
         body: JSON.stringify({ handed_over: true })
       });
       if (res.ok) {
-        showToast(`📦 ${t('handoffSuccess')}`);
+        showToast(`${t('handoffSuccess')}`);
         fetchData();
       } else {
         Alert.alert(t('alertError'), t('handoffFail'));
@@ -1358,7 +1358,7 @@ function MainApp() {
                 headers: { Authorization: `Bearer ${token}` }
               });
               if (res.ok) {
-                showToast(lang === 'ar' ? '🗑️ تم حذف الشحنة بنجاح' : '🗑️ Order deleted successfully');
+                showToast(lang === 'ar' ? 'تم حذف الشحنة بنجاح' : 'Order deleted successfully');
                 fetchData();
               } else {
                 const d = await res.json();
@@ -1426,8 +1426,8 @@ function MainApp() {
       });
       if (res.ok) {
         showToast(isEditing
-          ? (lang === 'ar' ? '✏️ تم تحديث بيانات الشحنة بنجاح!' : '✏️ Order updated successfully!')
-          : `🚀 ${t('orderCreatedMsg')}`
+          ? (lang === 'ar' ? 'تم تحديث بيانات الشحنة بنجاح!' : 'Order updated successfully!')
+          : `${t('orderCreatedMsg')}`
         );
         setCreateOrderModal(false);
         setEditingOrderId(null);
@@ -1455,7 +1455,7 @@ function MainApp() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        showToast(`✅ ${t('approvedMsg')}`);
+        showToast(`${t('approvedMsg')}`);
         fetchData();
       }
     } catch (e) {
@@ -1482,7 +1482,7 @@ function MainApp() {
                 headers: { Authorization: `Bearer ${token}` }
               });
               if (res.ok) {
-                showToast(`🗑️ ${t('rejectedMsg')}`);
+                showToast(`${t('rejectedMsg')}`);
                 fetchData();
               }
             } catch (e) {
@@ -1577,12 +1577,12 @@ function MainApp() {
             <Text style={[styles.themeToggleText, theme.text]}>{isDarkMode ? t('lightMode') : t('darkMode')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.langBtn} onPress={toggleLanguage}>
-            <Text style={styles.langBtnText}>🌐 {t('languageName')}</Text>
+            <Text style={styles.langBtnText}>{t('languageName')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.authHeader}>
-          <Text style={[styles.brandTitle, { color: isDarkMode ? '#60a5fa' : '#1e40af' }]}>🚀 {t('brandName')}</Text>
+          <Text style={[styles.brandTitle, { color: isDarkMode ? '#60a5fa' : '#1e40af' }]}>{t('brandName')}</Text>
           <Text style={[styles.brandSubtitle, theme.textMuted]}>
             {activeAuthTab === 'login' ? t('loginSubtitle') : t('registerSubtitle')}
           </Text>
@@ -1591,7 +1591,7 @@ function MainApp() {
         <ScrollView style={styles.formContainer} contentContainerStyle={{ paddingBottom: 50 }}>
           {authError ? (
             <View style={styles.errorBox}>
-              <Text style={[styles.errorText, isRTL && styles.rtlText]}>⚠️ {authError}</Text>
+              <Text style={[styles.errorText, isRTL && styles.rtlText]}>{authError}</Text>
             </View>
           ) : null}
 
@@ -1737,7 +1737,7 @@ function MainApp() {
 
               {confirmPassword.length > 0 && (
                 <Text style={{ color: password === confirmPassword ? '#10b981' : '#ef4444', fontSize: 12, marginTop: 4, textAlign: isRTL ? 'right' : 'left' }}>
-                  {password === confirmPassword ? '✅ ' + (lang === 'ar' ? 'كلمتا المرور متطابقتان' : 'Passwords match') : '❌ ' + t('passwordMismatch')}
+                  {password === confirmPassword ? '' + (lang === 'ar' ? 'كلمتا المرور متطابقتان' : 'Passwords match') : '' + t('passwordMismatch')}
                 </Text>
               )}
 
@@ -1810,7 +1810,7 @@ function MainApp() {
         <Modal visible={approvalModal} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalCard, theme.cardBg]}>
-              <Text style={[styles.modalTitle, { color: '#f59e0b' }]}>🛡️ {lang === 'ar' ? 'في انتظار الموافقة' : 'Pending Approval'}</Text>
+              <Text style={[styles.modalTitle, { color: '#f59e0b' }]}>{lang === 'ar' ? 'في انتظار الموافقة' : 'Pending Approval'}</Text>
               <Text style={[theme.textMuted, { marginTop: 10, lineHeight: 22, textAlign: isRTL ? 'right' : 'left' }]}>
                 {lang === 'ar'
                   ? 'تم تسجيل حسابك كمدير تنفيذي بنجاح. يرجى انتظار موافقة مدير تنفيذي آخر لتفعيل صلاحيات تسجيل الدخول.'
@@ -1880,7 +1880,7 @@ function MainApp() {
 
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <TouchableOpacity style={styles.langBtn} onPress={toggleLanguage}>
-            <Text style={styles.langBtnText}>🌐 {t('languageName')}</Text>
+            <Text style={styles.langBtnText}>{t('languageName')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.themeToggleBtn, theme.inputBg]} onPress={() => setIsDarkMode(!isDarkMode)}>
             <Text style={[styles.themeToggleText, theme.text]}>{isDarkMode ? t('lightMode') : t('darkMode')}</Text>
@@ -1906,15 +1906,15 @@ function MainApp() {
             <View style={[styles.driverStatusCard, { backgroundColor: !driverOnline ? '#475569' : (activeOrders.length > 0 ? '#059669' : '#2563eb'), flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 10 }]}>
               <View style={{ flex: 1, minWidth: 150, paddingRight: isRTL ? 0 : 8, paddingLeft: isRTL ? 8 : 0 }}>
                 <Text style={[styles.driverStatusTitle, isRTL && styles.rtlText]}>
-                  {driverOnline ? (lang === 'ar' ? '🟢 حالة التواجد والخدمة' : '🟢 Active Duty & Order Status') : (lang === 'ar' ? '⭕ خارج الخدمة (غير متصل)' : '⭕ Offline Status')}
+                  {driverOnline ? (lang === 'ar' ? 'حالة التواجد والخدمة' : 'Active Duty & Order Status') : (lang === 'ar' ? '⭕ خارج الخدمة (غير متصل)' : '⭕ Offline Status')}
                 </Text>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                   <View style={[styles.statusDot, { backgroundColor: driverOnline ? '#10b981' : '#cbd5e1' }]} />
                   <Text style={[styles.driverStatusText, isRTL && styles.rtlText, { fontWeight: '800' }]} numberOfLines={1}>
                     {driverOnline
                       ? (activeOrders.length > 0
-                        ? (lang === 'ar' ? `📦 الشحنة الحالية: ${tStatus(activeOrders[0].status)}` : `📦 Active Order: ${tStatus(activeOrders[0].status)}`)
-                        : (lang === 'ar' ? '✅ جاهز للتوصيل — لا توجد شحنات نشطة' : '✅ Ready — No Active Deliveries'))
+                        ? (lang === 'ar' ? `الشحنة الحالية: ${tStatus(activeOrders[0].status)}` : `Active Order: ${tStatus(activeOrders[0].status)}`)
+                        : (lang === 'ar' ? 'جاهز للتوصيل — لا توجد شحنات نشطة' : 'Ready — No Active Deliveries'))
                       : t('youAreOffline')}
                   </Text>
                 </View>
@@ -1953,13 +1953,13 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}>{tStatus(item.status)}</Text>
                       </View>
                       <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                        📍 {dt(item.client_address)}
+                        {dt(item.client_address)}
                       </Text>
                       <Text style={[{ color: '#10b981', fontSize: 15, fontWeight: '800', marginTop: 4 }, isRTL && styles.rtlText]}>
-                        💰 {t('amountToCollect')}: ${parseFloat(item.order_amount || 0).toFixed(2)}
+                        {t('amountToCollect')}: ${parseFloat(item.order_amount || 0).toFixed(2)}
                       </Text>
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                        {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                       </Text>
 
                       {item.status === 'assigned' || item.status === 'notified_inventory' ? (
@@ -2009,7 +2009,7 @@ function MainApp() {
             {activeTab === 'tab2' && (
               <View>
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>
-                  💼 {t('collectionWallet')} & {t('pocketWallet')}
+                  {t('collectionWallet')} & {t('pocketWallet')}
                 </Text>
                 {(() => {
                   const driverWallet = getDriverWallet(user.id || user.username);
@@ -2037,7 +2037,7 @@ function MainApp() {
                 </TouchableOpacity>
 
                 <Text style={[styles.sectionTitle, theme.text, { marginTop: 22 }, isRTL && styles.rtlText]}>
-                  ⛽ {lang === 'ar' ? 'سجل المصاريف الأخيرة' : 'Recent Expenses Log'}
+                  {lang === 'ar' ? 'سجل المصاريف الأخيرة' : 'Recent Expenses Log'}
                 </Text>
                 {!walletSummary?.expenses || walletSummary.expenses.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{lang === 'ar' ? 'لا توجد مصاريف مسجلة' : 'No expenses logged yet.'}</Text>
@@ -2048,7 +2048,7 @@ function MainApp() {
                         <Text style={[{ color: '#ef4444', fontWeight: '900', fontSize: 16 }]}>-${parseFloat(exp.amount).toFixed(2)}</Text>
                         <Text style={[theme.textMuted, { fontSize: 11 }]}>{new Date(exp.created_at).toLocaleTimeString()}</Text>
                       </View>
-                      <Text style={[theme.text, { fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>📝 {dt(exp.reason)}</Text>
+                      <Text style={[theme.text, { fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>{dt(exp.reason)}</Text>
                     </View>
                   ))
                 )}
@@ -2058,7 +2058,7 @@ function MainApp() {
             {/* TAB 3: Delivery History */}
             {activeTab === 'tab3' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>📜 {t('tabHistory')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('tabHistory')}</Text>
                 {historyOrders.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noHistory')}</Text>
                 ) : (
@@ -2074,13 +2074,13 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: getStatusColor(item.status) }]}>{tStatus(item.status)}</Text>
                       </View>
                       <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                        📍 {dt(item.client_address)}
+                        {dt(item.client_address)}
                       </Text>
                       <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '800', marginTop: 3 }, isRTL && styles.rtlText]}>
-                        💰 ${parseFloat(item.order_amount || 0).toFixed(2)}
+                        ${parseFloat(item.order_amount || 0).toFixed(2)}
                       </Text>
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                        {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                       </Text>
                     </TouchableOpacity>
                   ))
@@ -2099,7 +2099,7 @@ function MainApp() {
                 <View style={{ marginBottom: 20 }}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                     <Text style={[styles.sectionTitle, theme.text, { fontSize: 17, marginBottom: 0 }, isRTL && styles.rtlText]}>
-                      📊 {lang === 'ar' ? 'مركز قيادة العمليات' : 'Supervisor Operations Command'}
+                      {lang === 'ar' ? 'مركز قيادة العمليات' : 'Supervisor Operations Command'}
                     </Text>
                   </View>
 
@@ -2109,22 +2109,22 @@ function MainApp() {
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
                       <TouchableOpacity onPress={() => openSupervisorCard('active')} activeOpacity={0.85} style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>📦 ACTIVE</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>ACTIVE</Text>
                           <Ionicons name="cube-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{activeOrders.length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{lang === 'ar' ? 'شحنات نشطة' : 'Active Orders'}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>👆 {lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>{lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity onPress={() => openSupervisorCard('transit')} activeOpacity={0.85} style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>🚚 TRANSIT</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>TRANSIT</Text>
                           <Ionicons name="car-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{safeOrders.filter(o => o.status === 'in_transit').length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{lang === 'ar' ? 'بالطريق' : 'In Transit'}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>👆 {lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>{lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -2132,22 +2132,22 @@ function MainApp() {
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
                       <TouchableOpacity onPress={() => openSupervisorCard('done')} activeOpacity={0.85} style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>✅ DONE</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>DONE</Text>
                           <Ionicons name="checkmark-circle-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{safeOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{lang === 'ar' ? 'مكتملة' : 'Completed'}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>👆 {lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>{lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity onPress={() => openSupervisorCard('drivers')} activeOpacity={0.85} style={[styles.statCardMini, { backgroundColor: '#7c3aed', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>🟢 DRIVERS</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>DRIVERS</Text>
                           <Ionicons name="people-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{safeDeliveryGuys.filter(g => g.online_status === 'online').length}/{safeDeliveryGuys.length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{lang === 'ar' ? 'متصلون' : 'Online'}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>👆 {lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 9, marginTop: 3 }}>{lang === 'ar' ? 'اضغط للتفاصيل' : 'Tap for details'}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -2198,19 +2198,19 @@ function MainApp() {
 
                       <View style={{ marginTop: 8, gap: 4 }}>
                         <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700' }]}>
-                          📍 {dt(o.client_address)}
+                          {dt(o.client_address)}
                         </Text>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                           <Text style={[{ color: '#059669', fontSize: 15, fontWeight: '900' }, isRTL && styles.rtlText]}>
-                            💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                            ${parseFloat(o.order_amount || 0).toFixed(2)}
                           </Text>
                           {o.delivery_guy_name ? (
                             <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
-                              🚚 Rider: {dt(o.delivery_guy_name)}
+                               Rider: {dt(o.delivery_guy_name)}
                             </Text>
                           ) : (
                             <Text style={[{ color: '#f59e0b', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
-                              ⚠️ Unassigned Rider
+                              Unassigned Rider
                             </Text>
                           )}
                         </View>
@@ -2236,7 +2236,7 @@ function MainApp() {
 
                       <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text style={{ color: '#2563eb', fontSize: 12, fontWeight: '800' }}>
-                          📜 {lang === 'ar' ? 'عرض تتبع رحلة الشحنة' : 'View Action Audit Log'} ➔
+                          {lang === 'ar' ? 'عرض تتبع رحلة الشحنة' : 'View Action Audit Log'}
                         </Text>
                         <Text style={[theme.textMuted, { fontSize: 11 }]}>
                           ⏱️ {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2251,7 +2251,7 @@ function MainApp() {
             {/* TAB 2: Driver Roster */}
             {activeTab === 'tab2' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>👥 {t('tabDriverRoster')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('tabDriverRoster')}</Text>
                 {safeDeliveryGuys.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : safeDeliveryGuys.map((g) => (
@@ -2264,17 +2264,17 @@ function MainApp() {
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
                         <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
-                        <Text style={[styles.clientName, theme.text, { fontSize: 15 }]}>👤 {dt(g.name || g.delivery_guy_name)} (@{g.username || 'driver'})</Text>
+                        <Text style={[styles.clientName, theme.text, { fontSize: 15 }]}>{dt(g.name || g.delivery_guy_name)} (@{g.username || 'driver'})</Text>
                       </View>
                       <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
                         {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
                       </Text>
                     </View>
                     <Text style={[styles.orderDetail, theme.textMuted, { marginTop: 6, fontSize: 13 }, isRTL && styles.rtlText]}>
-                      📞 {g.phone || 'N/A'}
+                      {g.phone || 'N/A'}
                     </Text>
                     <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>
-                      📊 {lang === 'ar' ? 'اضغط لعرض إحصائيات الأداء وميزانية العهدة 👈' : 'Tap to view performance stats & wallet budget 👈'}
+                      {lang === 'ar' ? 'اضغط لعرض إحصائيات الأداء وميزانية العهدة ' : 'Tap to view performance stats & wallet budget '}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -2284,7 +2284,7 @@ function MainApp() {
             {/* TAB 3: History */}
             {activeTab === 'tab3' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>📜 {t('tabHistory')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('tabHistory')}</Text>
                 {historyOrders.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noHistory')}</Text>
                 ) : (
@@ -2300,13 +2300,13 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status) }]}>{tStatus(o.status)}</Text>
                       </View>
                       <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                        📍 {dt(o.client_address)}
+                        {dt(o.client_address)}
                       </Text>
                       <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '800', marginTop: 3 }, isRTL && styles.rtlText]}>
-                        💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                        ${parseFloat(o.order_amount || 0).toFixed(2)}
                       </Text>
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                        {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                       </Text>
                     </TouchableOpacity>
                   ))
@@ -2337,21 +2337,21 @@ function MainApp() {
                       <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status) }]}>{tStatus(o.status)}</Text>
                     </View>
                     <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                      📍 {dt(o.client_address)}
+                      {dt(o.client_address)}
                     </Text>
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
                       <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '800' }, isRTL && styles.rtlText]}>
-                        💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                        ${parseFloat(o.order_amount || 0).toFixed(2)}
                       </Text>
                       {o.delivery_guy_name ? (
                         <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
-                          🚚 Rider: {dt(o.delivery_guy_name)}
+                           Rider: {dt(o.delivery_guy_name)}
                         </Text>
                       ) : null}
                     </View>
 
                     <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                      📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                      {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                     </Text>
 
                     {o.status === 'handed_to_delivery' ? (
@@ -2394,7 +2394,7 @@ function MainApp() {
             {activeTab === 'tab2' && (
               <View>
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>
-                  📋 {lang === 'ar' ? 'جميع شحنات النظام والتصفيات' : 'All System Orders & Statuses'}
+                  {lang === 'ar' ? 'جميع شحنات النظام والتصفيات' : 'All System Orders & Statuses'}
                 </Text>
 
                 {/* Filter Chip Bar */}
@@ -2460,28 +2460,28 @@ function MainApp() {
                       </View>
 
                       <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                        📍 {dt(o.client_address)}
+                        {dt(o.client_address)}
                       </Text>
 
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
                         <Text style={[{ color: '#059669', fontSize: 14, fontWeight: '900' }, isRTL && styles.rtlText]}>
-                          💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                          ${parseFloat(o.order_amount || 0).toFixed(2)}
                         </Text>
                         {o.delivery_guy_name ? (
                           <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
-                            🚚 Rider: {dt(o.delivery_guy_name)}
+                             Rider: {dt(o.delivery_guy_name)}
                           </Text>
                         ) : null}
                       </View>
 
                       {o.inventory_note ? (
                         <Text style={[{ color: '#ef4444', fontWeight: '700', marginTop: 4, fontSize: 12 }, isRTL && styles.rtlText]}>
-                          ⚠️ Note: {dt(o.inventory_note)}
+                          Note: {dt(o.inventory_note)}
                         </Text>
                       ) : null}
 
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                        {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                       </Text>
                     </TouchableOpacity>
                   ));
@@ -2496,7 +2496,7 @@ function MainApp() {
           <View>
             {activeTab === 'tab1' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>💰 {t('deliveryRoster')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('deliveryRoster')}</Text>
                 {safeFinanceWallets.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : safeFinanceWallets.map((g) => {
@@ -2515,7 +2515,7 @@ function MainApp() {
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
                           <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
-                          <Text style={[styles.clientName, theme.text]}>👤 {dt(g.delivery_guy_name || g.name)}</Text>
+                          <Text style={[styles.clientName, theme.text]}>{dt(g.delivery_guy_name || g.name)}</Text>
                         </View>
                         <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
                           {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
@@ -2530,7 +2530,7 @@ function MainApp() {
                         >
                           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={[styles.walletLabel, isRTL && styles.rtlText]}>{t('collectionWallet')}</Text>
-                            <Text style={{ color: '#ffffff', fontSize: 11 }}>{expandedDriverWalletId === driverId ? '▲' : '👇'}</Text>
+                            <Text style={{ color: '#ffffff', fontSize: 11 }}>{expandedDriverWalletId === driverId ? '▲' : '▾'}</Text>
                           </View>
                           <Text style={[styles.walletValue, isRTL && styles.rtlText]}>${collectionBal.toFixed(2)}</Text>
 
@@ -2538,9 +2538,9 @@ function MainApp() {
                             <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
                               {collectionBal > 0
                                 ? (driverDeliveredOrders.length > 0
-                                  ? (lang === 'ar' ? `👇 ${driverDeliveredOrders.length} شحنات معلقة (انقر للعرض)` : `👇 ${driverDeliveredOrders.length} Pending (Tap to view)`)
-                                  : (lang === 'ar' ? '💵 نقدية بحوزة المندوب' : '💵 Cash Held'))
-                                : (lang === 'ar' ? '✅ مسواة بالكامل' : '✅ Fully Settled')}
+                                  ? (lang === 'ar' ? `▾ ${driverDeliveredOrders.length} شحنات معلقة (انقر للعرض)` : `▾ ${driverDeliveredOrders.length} Pending (Tap to view)`)
+                                  : (lang === 'ar' ? 'نقدية بحوزة المندوب' : 'Cash Held'))
+                                : (lang === 'ar' ? 'مسواة بالكامل' : 'Fully Settled')}
                             </Text>
                           </View>
 
@@ -2556,7 +2556,7 @@ function MainApp() {
                               <ActivityIndicator size="small" color="#ffffff" />
                             ) : (
                               <Text style={styles.miniActionText}>
-                                {collectionBal > 0 ? (lang === 'ar' ? '⚡ تسوية الكل دفعة واحدة' : '⚡ Clear All Orders') : (lang === 'ar' ? '✅ مسواة بالكامل' : '✅ Cash Fully Settled')}
+                                {collectionBal > 0 ? (lang === 'ar' ? 'تسوية الكل دفعة واحدة' : 'Clear All Orders') : (lang === 'ar' ? 'مسواة بالكامل' : 'Cash Fully Settled')}
                               </Text>
                             )}
                           </TouchableOpacity>
@@ -2570,7 +2570,7 @@ function MainApp() {
                           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Text style={[styles.walletLabel, isRTL && styles.rtlText]}>{t('pocketWallet')}</Text>
                             {(user.role === 'finance' || user.role === 'manager') ? (
-                              <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>📜 {lang === 'ar' ? 'السجل ➔' : 'Ledger ➔'}</Text>
+                              <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>{lang === 'ar' ? 'السجل' : 'Ledger'}</Text>
                             ) : null}
                           </View>
                           <Text style={[styles.walletValue, isRTL && styles.rtlText]}>${pocketBal.toFixed(2)}</Text>
@@ -2578,10 +2578,10 @@ function MainApp() {
                           <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, alignSelf: isRTL ? 'flex-end' : 'flex-start', marginBottom: 4 }}>
                             <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
                               {pocketBal > 0
-                                ? (lang === 'ar' ? '🟢 عهدة متاحة' : '🟢 Available')
+                                ? (lang === 'ar' ? 'عهدة متاحة' : 'Available')
                                 : (pocketBal < 0
-                                  ? (lang === 'ar' ? '⚠️ عجز بالعهدة' : '⚠️ Deficit')
-                                  : (lang === 'ar' ? '⚪ رصيد صفر' : '⚪ Zero'))}
+                                  ? (lang === 'ar' ? 'عجز بالعهدة' : 'Deficit')
+                                  : (lang === 'ar' ? 'رصيد صفر' : 'Zero'))}
                             </Text>
                           </View>
 
@@ -2606,10 +2606,10 @@ function MainApp() {
                         <View style={{ marginTop: 12, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1' }}>
                           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                             <Text style={[theme.text, { fontSize: 12, fontWeight: '800' }, isRTL && styles.rtlText]}>
-                              📦 {lang === 'ar' ? 'شحنات بانتظار تسوية النقدية:' : 'Delivered Orders Pending Cash Settlement:'}
+                              {lang === 'ar' ? 'شحنات بانتظار تسوية النقدية:' : 'Delivered Orders Pending Cash Settlement:'}
                             </Text>
                             <TouchableOpacity onPress={() => setExpandedDriverWalletId(null)}>
-                              <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700' }}>✖ {lang === 'ar' ? 'إغلاق' : 'Close'}</Text>
+                              <Text style={{ color: '#64748b', fontSize: 11, fontWeight: '700' }}>✕ {lang === 'ar' ? 'إغلاق' : 'Close'}</Text>
                             </TouchableOpacity>
                           </View>
                           {driverDeliveredOrders.map((ord) => (
@@ -2621,7 +2621,7 @@ function MainApp() {
                             >
                               <View style={{ flex: 1, minWidth: 140 }}>
                                 <Text style={[theme.text, { fontSize: 13, fontWeight: '800' }]}>#{ord.tracking_number}</Text>
-                                <Text style={[theme.textMuted, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>📍 {dt(ord.client_address)}</Text>
+                                <Text style={[theme.textMuted, { fontSize: 11, marginTop: 2 }]} numberOfLines={1}>{dt(ord.client_address)}</Text>
                               </View>
                               <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
                                 <Text style={{ color: '#059669', fontSize: 14, fontWeight: '900' }}>${parseFloat(ord.order_amount || 0).toFixed(2)}</Text>
@@ -2633,7 +2633,7 @@ function MainApp() {
                                   {actionLoadingId === `clearOrder_${ord.id}` ? (
                                     <ActivityIndicator size="small" color="#ffffff" />
                                   ) : (
-                                    <Text style={[styles.miniActionText, { fontSize: 11 }]}>💵 {lang === 'ar' ? 'تسوية النقدية' : 'Clear Cash'}</Text>
+                                    <Text style={[styles.miniActionText, { fontSize: 11 }]}>{lang === 'ar' ? 'تسوية النقدية' : 'Clear Cash'}</Text>
                                   )}
                                 </TouchableOpacity>
                               </View>
@@ -2650,7 +2650,7 @@ function MainApp() {
             {/* TAB 2: Audit History */}
             {activeTab === 'tab2' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>📜 {t('tabAuditHistory')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('tabAuditHistory')}</Text>
                 {safeOrders.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noHistory')}</Text>
                 ) : (
@@ -2666,19 +2666,19 @@ function MainApp() {
                         <View style={[styles.orderHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
                           <Text style={[styles.trackingNum, theme.text]}>#{o.tracking_number}</Text>
                           <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status) }]}>
-                            {isCleared ? (lang === 'ar' ? '💰 تم تحصيلها وتوريدها' : '💰 Cash Cleared & Settled') : tStatus(o.status)}
+                            {isCleared ? (lang === 'ar' ? 'تم تحصيلها وتوريدها' : 'Cash Cleared & Settled') : tStatus(o.status)}
                           </Text>
                         </View>
                         <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 13, fontWeight: '700', marginTop: 4 }]}>
-                          📍 {dt(o.client_address)}
+                          {dt(o.client_address)}
                         </Text>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                           <Text style={[{ color: '#10b981', fontSize: 14, fontWeight: '900' }, isRTL && styles.rtlText]}>
-                            💵 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                            ${parseFloat(o.order_amount || 0).toFixed(2)}
                           </Text>
                         </View>
                         <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700', marginTop: 6 }, isRTL && styles.rtlText]}>
-                          📜 {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل ➔' : 'Tap to view full order journey ➔'}
+                          {lang === 'ar' ? 'اضغط لعرض مسار الشحنة بالكامل' : 'Tap to view full order journey'}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -2698,10 +2698,10 @@ function MainApp() {
               <View>
                 <View style={{ marginBottom: 16, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1' }}>
                   <Text style={[styles.sectionTitle, theme.text, { fontSize: 18, marginBottom: 4 }, isRTL && styles.rtlText]}>
-                    📊 {t('execHeaderTitle')}
+                    {t('execHeaderTitle')}
                   </Text>
                   <Text style={[theme.textMuted, { fontSize: 12, marginBottom: 16 }, isRTL && styles.rtlText]}>
-                    👁️ {t('execHeaderSubtitle')}
+                    {t('execHeaderSubtitle')}
                   </Text>
 
                   {/* Company Grand Metrics Grid */}
@@ -2710,23 +2710,23 @@ function MainApp() {
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
                       <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>🚚 {t('execFleetCardLabel')}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}> {t('execFleetCardLabel')}</Text>
                           <Ionicons name="people-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{safeDeliveryGuys.length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>
-                          🟢 {safeDeliveryGuys.filter(g => g.online_status === 'online').length} {t('execOnlineDrivers')}
+                          {safeDeliveryGuys.filter(g => g.online_status === 'online').length} {t('execOnlineDrivers')}
                         </Text>
                       </View>
 
                       <View style={[styles.statCardMini, { backgroundColor: '#7c3aed', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>📦 {t('execOrdersCardLabel')}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execOrdersCardLabel')}</Text>
                           <Ionicons name="cube-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 24, marginTop: 4 }]}>{safeOrders.length}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>
-                          ✅ {historyOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length} {t('execCompletedOrders')}
+                          {historyOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length} {t('execCompletedOrders')}
                         </Text>
                       </View>
                     </View>
@@ -2735,7 +2735,7 @@ function MainApp() {
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
                       <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>💵 {t('execCashCardLabel')}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execCashCardLabel')}</Text>
                           <Ionicons name="wallet-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 4 }]}>${grandCollectionCash.toFixed(2)}</Text>
@@ -2744,7 +2744,7 @@ function MainApp() {
 
                       <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 14, borderRadius: 14 }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>⛽ {t('execExpensesCardLabel')}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execExpensesCardLabel')}</Text>
                           <Ionicons name="receipt-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 4 }]}>${grandSpentExpenses.toFixed(2)}</Text>
@@ -2755,7 +2755,7 @@ function MainApp() {
                 </View>
 
                 {/* Department Quick Summaries */}
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>🏢 {t('execDepartmentOverviews')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execDepartmentOverviews')}</Text>
 
                 <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentBlue]} onPress={() => setActiveTab('tab2')}>
                   <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execSupervisorDeptTitle')}</Text>
@@ -2786,7 +2786,7 @@ function MainApp() {
             {/* TAB 2: Operations Board (Read-Only) */}
             {activeTab === 'tab2' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>📋 {t('execAllOpsTitle')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execAllOpsTitle')}</Text>
                 {safeOrders.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : (
@@ -2802,20 +2802,20 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status) }]}>{tStatus(o.status)}</Text>
                       </View>
                       <Text style={[styles.orderDetail, theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '700', marginTop: 4 }]}>
-                        📍 {dt(o.client_address)}
+                        {dt(o.client_address)}
                       </Text>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                         <Text style={[{ color: '#059669', fontSize: 15, fontWeight: '900' }, isRTL && styles.rtlText]}>
-                          💰 ${parseFloat(o.order_amount || 0).toFixed(2)}
+                          ${parseFloat(o.order_amount || 0).toFixed(2)}
                         </Text>
                         {o.delivery_guy_name ? (
                           <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '700' }, isRTL && styles.rtlText]}>
-                            🚚 {dt(o.delivery_guy_name)}
+                             {dt(o.delivery_guy_name)}
                           </Text>
                         ) : null}
                       </View>
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        📜 {lang === 'ar' ? 'اضغط لعرض مسار وتاريخ الشحنة بالكامل ➔' : 'Tap to inspect full order journey ➔'}
+                        {lang === 'ar' ? 'اضغط لعرض مسار وتاريخ الشحنة بالكامل' : 'Tap to inspect full order journey'}
                       </Text>
                     </TouchableOpacity>
                   ))
@@ -2826,7 +2826,7 @@ function MainApp() {
             {/* TAB 3: Fleet Roster & Wallets (Read-Only) */}
             {activeTab === 'tab3' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>👥 {t('execFleetRosterTitle')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execFleetRosterTitle')}</Text>
                 {safeFinanceWallets.map((g) => {
                   const driverId = g.delivery_guy_id || g.id;
                   const collectionBal = parseFloat(g.collection_balance || 0);
@@ -2842,7 +2842,7 @@ function MainApp() {
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
                           <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
-                          <Text style={[styles.clientName, theme.text]}>👤 {dt(g.delivery_guy_name || g.name)} (@{g.username || 'driver'})</Text>
+                          <Text style={[styles.clientName, theme.text]}>{dt(g.delivery_guy_name || g.name)} (@{g.username || 'driver'})</Text>
                         </View>
                         <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
                           {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
@@ -2869,17 +2869,17 @@ function MainApp() {
             {/* TAB 4: Expenses Log Breakdown (Read-Only) */}
             {activeTab === 'tab4' && (
               <View>
-                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>⛽ {t('execFleetExpensesTitle')}</Text>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execFleetExpensesTitle')}</Text>
                 {!expensesBreakdown?.breakdown || expensesBreakdown.breakdown.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('execNoExpensesYet')}</Text>
                 ) : (
                   expensesBreakdown.breakdown.map((exp) => (
                     <View key={exp.id} style={[styles.orderCard, theme.cardBg, styles.statCardAccentPurple, { paddingVertical: 12 }]}>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={[theme.text, { fontWeight: '800', fontSize: 14 }]}>👤 {dt(exp.delivery_guy_name)}</Text>
+                        <Text style={[theme.text, { fontWeight: '800', fontSize: 14 }]}>{dt(exp.delivery_guy_name)}</Text>
                         <Text style={[{ color: '#ef4444', fontWeight: '900', fontSize: 16 }]}>-${parseFloat(exp.amount).toFixed(2)}</Text>
                       </View>
-                      <Text style={[theme.text, { fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>📝 {dt(exp.reason)}</Text>
+                      <Text style={[theme.text, { fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>{dt(exp.reason)}</Text>
                       <Text style={[theme.textMuted, { fontSize: 11, marginTop: 4 }, isRTL && styles.rtlText]}>
                         ⏱️ {new Date(exp.created_at).toLocaleString()}
                       </Text>
@@ -2899,12 +2899,12 @@ function MainApp() {
                   pendingManagers.map((m) => (
                     <View key={m.id} style={[styles.orderCard, theme.cardBg, styles.statCardAccentPurple]}>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={[styles.clientName, theme.text, isRTL && styles.rtlText]}>👤 {dt(m.name)} (@{m.username})</Text>
+                        <Text style={[styles.clientName, theme.text, isRTL && styles.rtlText]}>{dt(m.name)} (@{m.username})</Text>
                         <Text style={[styles.statusTag, { backgroundColor: '#7c3aed' }]}>
                           {m.role ? m.role.replace('_', ' ').toUpperCase() : 'USER'}
                         </Text>
                       </View>
-                      <Text style={[styles.orderDetail, theme.textMuted, isRTL && styles.rtlText, { marginTop: 4 }]}>📞 {m.phone || 'N/A'}</Text>
+                      <Text style={[styles.orderDetail, theme.textMuted, isRTL && styles.rtlText, { marginTop: 4 }]}>{m.phone || 'N/A'}</Text>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: '#10b981', flex: 1, minWidth: 120 }]}
@@ -3001,7 +3001,7 @@ function MainApp() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
-              {editingOrderId ? (lang === 'ar' ? '✏️ تعديل بيانات الشحنة' : '✏️ Edit Order Details') : t('dispatchOrderTitle')}
+              {editingOrderId ? (lang === 'ar' ? 'تعديل بيانات الشحنة' : 'Edit Order Details') : t('dispatchOrderTitle')}
             </Text>
 
             {/* Field 1: Order Number (Mandatory manual input) */}
@@ -3110,7 +3110,7 @@ function MainApp() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
-              📦 {lang === 'ar' ? 'تحديث حالة الشحنة' : 'Update Delivery Progress'} #{selectedOrderForStatus?.tracking_number}
+              {lang === 'ar' ? 'تحديث حالة الشحنة' : 'Update Delivery Progress'} #{selectedOrderForStatus?.tracking_number}
             </Text>
 
             {selectedOrderForStatus && (selectedOrderForStatus.status === 'assigned' || selectedOrderForStatus.status === 'notified_inventory') && (
@@ -3124,7 +3124,7 @@ function MainApp() {
                     updateDeliveryStatus(id, 'handed_to_delivery');
                   }}
                 >
-                  <Text style={styles.actionBtnText}>🏭 {t('pickupFromWarehouse')}</Text>
+                  <Text style={styles.actionBtnText}>{t('pickupFromWarehouse')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -3140,7 +3140,7 @@ function MainApp() {
                     updateDeliveryStatus(id, 'in_transit');
                   }}
                 >
-                  <Text style={styles.actionBtnText}>🚚 {t('startTransit')}</Text>
+                  <Text style={styles.actionBtnText}> {t('startTransit')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -3161,7 +3161,7 @@ function MainApp() {
                       updateDeliveryStatus(id, 'delivered', amt);
                     }}
                   >
-                    <Text style={styles.actionBtnText}>✅ {t('deliveredCollect')}</Text>
+                    <Text style={styles.actionBtnText}>{t('deliveredCollect')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -3174,7 +3174,7 @@ function MainApp() {
                       setFailureModal(true);
                     }}
                   >
-                    <Text style={styles.actionBtnText}>❌ {t('deliveryFailed')}</Text>
+                    <Text style={styles.actionBtnText}>{t('deliveryFailed')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -3195,7 +3195,7 @@ function MainApp() {
               <View>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
-                    👤 {dt(selectedDriverForStats.name || selectedDriverForStats.delivery_guy_name)}
+                    {dt(selectedDriverForStats.name || selectedDriverForStats.delivery_guy_name)}
                   </Text>
                   <Text style={[styles.statusTag, { backgroundColor: selectedDriverForStats.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
                     {selectedDriverForStats.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
@@ -3203,11 +3203,11 @@ function MainApp() {
                 </View>
 
                 <Text style={[theme.textMuted, { fontSize: 13, marginBottom: 12 }, isRTL && styles.rtlText]}>
-                  📞 {lang === 'ar' ? 'رقم الهاتف:' : 'Phone:'} {selectedDriverForStats.phone || 'N/A'} | @{selectedDriverForStats.username || 'driver'}
+                  {lang === 'ar' ? 'رقم الهاتف:' : 'Phone:'} {selectedDriverForStats.phone || 'N/A'} | @{selectedDriverForStats.username || 'driver'}
                 </Text>
 
                 <Text style={[styles.sectionTitle, theme.text, { fontSize: 15, marginBottom: 8 }, isRTL && styles.rtlText]}>
-                  📊 {lang === 'ar' ? 'إحصائيات الأداء والشحنات' : 'Delivery Performance KPIs'}
+                  {lang === 'ar' ? 'إحصائيات الأداء والشحنات' : 'Delivery Performance KPIs'}
                 </Text>
                 {(() => {
                   const driverId = selectedDriverForStats.id || selectedDriverForStats.delivery_guy_id;
@@ -3223,18 +3223,18 @@ function MainApp() {
                       {/* KPI Row */}
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginBottom: 14 }}>
                         <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>📦 {lang === 'ar' ? 'إجمالي الإسناد' : 'TOTAL ASSIGNED'}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'إجمالي الإسناد' : 'TOTAL ASSIGNED'}</Text>
                           <Text style={[styles.statCardMiniVal, { fontSize: 26, marginTop: 4 }]}>{totalAssigned}</Text>
                         </View>
                         <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>✅ {lang === 'ar' ? 'تم التسليم' : 'COMPLETED'}</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'تم التسليم' : 'COMPLETED'}</Text>
                           <Text style={[styles.statCardMiniVal, { fontSize: 26, marginTop: 4 }]}>{completedCount}</Text>
                         </View>
                       </View>
 
                       {/* Wallet Section */}
                       <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginBottom: 10 }, isRTL && styles.rtlText]}>
-                        💰 {lang === 'ar' ? 'الميزانية والمحافظ' : 'Wallet Budget & Cash'}
+                        {lang === 'ar' ? 'الميزانية والمحافظ' : 'Wallet Budget & Cash'}
                       </Text>
                       <View style={{
                         backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
@@ -3244,14 +3244,14 @@ function MainApp() {
                       }}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
-                            💵 {lang === 'ar' ? 'نقدية التحصيل بحوزته:' : 'Collection Cash Liability:'}
+                            {lang === 'ar' ? 'نقدية التحصيل بحوزته:' : 'Collection Cash Liability:'}
                           </Text>
                           <Text style={{ color: '#059669', fontWeight: '900', fontSize: 15 }}>${colBal.toFixed(2)}</Text>
                         </View>
                         <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }} />
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
-                            💳 {lang === 'ar' ? 'رصيد العهدة الحالية:' : 'Pocket Allowance Balance:'}
+                            {lang === 'ar' ? 'رصيد العهدة الحالية:' : 'Pocket Allowance Balance:'}
                           </Text>
                           <Text style={{ color: pockBal < 0 ? '#ef4444' : '#2563eb', fontWeight: '900', fontSize: 15 }}>${pockBal.toFixed(2)}</Text>
                         </View>
@@ -3275,10 +3275,10 @@ function MainApp() {
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '88%' }]}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <Text style={[styles.modalTitle, theme.text, { flex: 1 }, isRTL && styles.rtlText]}>
-                {supervisorCardType === 'active' && (lang === 'ar' ? '📦 الطلبات النشطة' : '📦 Active Orders')}
-                {supervisorCardType === 'transit' && (lang === 'ar' ? '🚚 قيد التوصيل' : '🚚 In Transit Orders')}
-                {supervisorCardType === 'done' && (lang === 'ar' ? '✅ الطلبات المكتملة' : '✅ Completed Orders')}
-                {supervisorCardType === 'drivers' && (lang === 'ar' ? '👥 حالة السائقين' : '👥 Drivers Status')}
+                {supervisorCardType === 'active' && (lang === 'ar' ? 'الطلبات النشطة' : 'Active Orders')}
+                {supervisorCardType === 'transit' && (lang === 'ar' ? ' قيد التوصيل' : ' In Transit Orders')}
+                {supervisorCardType === 'done' && (lang === 'ar' ? 'الطلبات المكتملة' : 'Completed Orders')}
+                {supervisorCardType === 'drivers' && (lang === 'ar' ? 'حالة السائقين' : 'Drivers Status')}
               </Text>
               <TouchableOpacity onPress={() => setSupervisorCardModal(false)} style={{ padding: 4 }}>
                 <Ionicons name="close-circle" size={22} color={isDarkMode ? '#94a3b8' : '#64748b'} />
@@ -3311,7 +3311,7 @@ function MainApp() {
                         paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8
                       }}>
                         <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>
-                          {g.online_status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                          {g.online_status === 'online' ? 'Online' : '⚫ Offline'}
                         </Text>
                       </View>
                     </View>
@@ -3341,13 +3341,13 @@ function MainApp() {
                           <Text style={{ color: '#2563eb', fontWeight: '800', fontSize: 13 }}>#{o.tracking_number}</Text>
                           <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status), fontSize: 10 }]}>{tStatus(o.status)}</Text>
                         </View>
-                        <Text style={[theme.text, { fontSize: 13, fontWeight: '600', marginBottom: 2 }, isRTL && styles.rtlText]}>📍 {dt(o.client_address)}</Text>
+                        <Text style={[theme.text, { fontSize: 13, fontWeight: '600', marginBottom: 2 }, isRTL && styles.rtlText]}>{dt(o.client_address)}</Text>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                          <Text style={{ color: '#059669', fontSize: 13, fontWeight: '900' }}>💰 ${parseFloat(o.order_amount || 0).toFixed(2)}</Text>
+                          <Text style={{ color: '#059669', fontSize: 13, fontWeight: '900' }}>${parseFloat(o.order_amount || 0).toFixed(2)}</Text>
                           {o.delivery_guy_name ? (
-                            <Text style={{ color: '#6366f1', fontSize: 11, fontWeight: '700' }}>🚚 {dt(o.delivery_guy_name)}</Text>
+                            <Text style={{ color: '#6366f1', fontSize: 11, fontWeight: '700' }}> {dt(o.delivery_guy_name)}</Text>
                           ) : (
-                            <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '700' }}>⚠️ {lang === 'ar' ? 'غير معين' : 'Unassigned'}</Text>
+                            <Text style={{ color: '#f59e0b', fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'غير معين' : 'Unassigned'}</Text>
                           )}
                         </View>
                       </View>
@@ -3370,7 +3370,7 @@ function MainApp() {
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '85%' }]}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <Text style={[styles.modalTitle, theme.text, { fontSize: 16, flex: 1 }, isRTL && styles.rtlText]}>
-                📜 {lang === 'ar' ? 'مسار وسجل الشحنة' : 'Order Journey & Details'} #{selectedOrderForAudit?.tracking_number}
+                {lang === 'ar' ? 'مسار وسجل الشحنة' : 'Order Journey & Details'} #{selectedOrderForAudit?.tracking_number}
               </Text>
               {selectedOrderForAudit?.status && (
                 <Text style={[styles.statusTag, { backgroundColor: getStatusColor(selectedOrderForAudit.status) }]}>
@@ -3383,18 +3383,18 @@ function MainApp() {
               <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0', marginBottom: 12, gap: 6 }}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
                   <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
-                    👤 {dt(selectedOrderForAudit.client_name)} {selectedOrderForAudit.client_phone ? `(${selectedOrderForAudit.client_phone})` : ''}
+                    {dt(selectedOrderForAudit.client_name)} {selectedOrderForAudit.client_phone ? `(${selectedOrderForAudit.client_phone})` : ''}
                   </Text>
                   <Text style={[{ color: '#059669', fontWeight: '900', fontSize: 16 }]}>
                     ${parseFloat(selectedOrderForAudit.order_amount || 0).toFixed(2)}
                   </Text>
                 </View>
                 <Text style={[theme.textMuted, { fontSize: 12 }, isRTL && styles.rtlText]}>
-                  📍 {dt(selectedOrderForAudit.client_address)}
+                  {dt(selectedOrderForAudit.client_address)}
                 </Text>
                 {selectedOrderForAudit.order_details ? (
                   <Text style={[theme.textMuted, { fontSize: 12 }, isRTL && styles.rtlText]}>
-                    📦 {dt(selectedOrderForAudit.order_details)}
+                    {dt(selectedOrderForAudit.order_details)}
                   </Text>
                 ) : null}
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
@@ -3402,13 +3402,13 @@ function MainApp() {
                     <Text style={[theme.textMuted, { fontSize: 11 }]}>👔 {lang === 'ar' ? 'المشرف:' : 'Supervisor:'} {dt(selectedOrderForAudit.supervisor_name)}</Text>
                   ) : null}
                   {selectedOrderForAudit.delivery_guy_name ? (
-                    <Text style={[theme.textMuted, { fontSize: 11 }]}>🚚 {lang === 'ar' ? 'المندوب:' : 'Rider:'} {dt(selectedOrderForAudit.delivery_guy_name)}</Text>
+                    <Text style={[theme.textMuted, { fontSize: 11 }]}> {lang === 'ar' ? 'المندوب:' : 'Rider:'} {dt(selectedOrderForAudit.delivery_guy_name)}</Text>
                   ) : null}
                   {selectedOrderForAudit.inventory_note ? (
-                    <Text style={[{ color: '#ef4444', fontSize: 11, fontWeight: '700' }]}>⚠️ {dt(selectedOrderForAudit.inventory_note)}</Text>
+                    <Text style={[{ color: '#ef4444', fontSize: 11, fontWeight: '700' }]}>{dt(selectedOrderForAudit.inventory_note)}</Text>
                   ) : null}
                   {selectedOrderForAudit.delivery_failure_reason ? (
-                    <Text style={[{ color: '#ef4444', fontSize: 11, fontWeight: '700' }]}>❌ {dt(selectedOrderForAudit.delivery_failure_reason)}</Text>
+                    <Text style={[{ color: '#ef4444', fontSize: 11, fontWeight: '700' }]}>{dt(selectedOrderForAudit.delivery_failure_reason)}</Text>
                   ) : null}
                 </View>
               </View>
@@ -3436,11 +3436,11 @@ function MainApp() {
                       </Text>
                     </View>
                     <Text style={[theme.text, { fontWeight: '700', fontSize: 12, marginTop: 4 }, isRTL && styles.rtlText]}>
-                      👤 {dt(log.changed_by_name || 'System')} ({t(log.changed_by_role) || log.changed_by_role})
+                      {dt(log.changed_by_name || 'System')} ({t(log.changed_by_role) || log.changed_by_role})
                     </Text>
                     {log.comment ? (
                       <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
-                        📝 {dt(log.comment)}
+                        {dt(log.comment)}
                       </Text>
                     ) : null}
                   </View>
@@ -3499,7 +3499,7 @@ function MainApp() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
-              ➕ {t('topupModalTitle')} ({dt(targetDriver?.delivery_guy_name || targetDriver?.name)})
+              {t('topupModalTitle')} ({dt(targetDriver?.delivery_guy_name || targetDriver?.name)})
             </Text>
             <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('topupAmountLabel')}</Text>
             <TextInput
@@ -3534,10 +3534,10 @@ function MainApp() {
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '85%' }]}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <Text style={[styles.modalTitle, theme.text, { fontSize: 16, flex: 1 }, isRTL && styles.rtlText]}>
-                📜 {lang === 'ar' ? 'سجل وكشف حساب العهدة' : 'Pocket Wallet Ledger History'}
+                {lang === 'ar' ? 'سجل وكشف حساب العهدة' : 'Pocket Wallet Ledger History'}
               </Text>
               <TouchableOpacity onPress={() => { setPocketLedgerModal(false); setSelectedDriverLedgerData(null); }}>
-                <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>✖ {t('cancel')}</Text>
+                <Text style={{ color: '#64748b', fontSize: 13, fontWeight: '700' }}>✕ {t('cancel')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -3552,10 +3552,10 @@ function MainApp() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', marginBottom: 14 }}>
                   <Text style={[theme.text, { fontSize: 15, fontWeight: '800' }, isRTL && styles.rtlText]}>
-                    👤 {dt(selectedDriverLedgerData.driver?.name)} (@{selectedDriverLedgerData.driver?.username})
+                    {dt(selectedDriverLedgerData.driver?.name)} (@{selectedDriverLedgerData.driver?.username})
                   </Text>
                   <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
-                    📞 {selectedDriverLedgerData.driver?.phone || 'N/A'}
+                    {selectedDriverLedgerData.driver?.phone || 'N/A'}
                   </Text>
 
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', gap: 6, flexWrap: 'wrap' }}>
@@ -3581,7 +3581,7 @@ function MainApp() {
                 </View>
 
                 <Text style={[theme.text, { fontSize: 13, fontWeight: '800', marginBottom: 8 }, isRTL && styles.rtlText]}>
-                  📊 {lang === 'ar' ? 'سجل المعاملات والعمليات التفصيلي:' : 'Itemized Transaction Ledger:'}
+                  {lang === 'ar' ? 'سجل المعاملات والعمليات التفصيلي:' : 'Itemized Transaction Ledger:'}
                 </Text>
 
                 {(!selectedDriverLedgerData.transactions || selectedDriverLedgerData.transactions.length === 0) && (!selectedDriverLedgerData.expenses || selectedDriverLedgerData.expenses.length === 0) ? (
@@ -3612,7 +3612,7 @@ function MainApp() {
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                             <Text style={{ fontSize: 13, fontWeight: '900', color: isTopup ? '#10b981' : '#ef4444' }}>
-                              {isTopup ? '💳 + $' + amt.toFixed(2) + ' (Top-Up)' : '⛽ - $' + amt.toFixed(2) + ' (Expense)'}
+                              {isTopup ? '+ $' + amt.toFixed(2) + ' (Top-Up)' : '- $' + amt.toFixed(2) + ' (Expense)'}
                             </Text>
                           </View>
                           <Text style={[theme.textMuted, { fontSize: 11 }]}>
@@ -3622,19 +3622,19 @@ function MainApp() {
 
                         {item.reason ? (
                           <Text style={[theme.text, { fontSize: 12, fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>
-                            📝 {lang === 'ar' ? 'السبب:' : 'Reason:'} {dt(item.reason)}
+                            {lang === 'ar' ? 'السبب:' : 'Reason:'} {dt(item.reason)}
                           </Text>
                         ) : null}
 
                         {item.notes_or_reason ? (
                           <Text style={[theme.textMuted, { fontSize: 11, marginTop: 2 }, isRTL && styles.rtlText]}>
-                            📌 {dt(item.notes_or_reason)}
+                            {dt(item.notes_or_reason)}
                           </Text>
                         ) : null}
 
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#f1f5f9' }}>
                           <Text style={[theme.textMuted, { fontSize: 11 }]}>
-                            👤 {lang === 'ar' ? 'بواسطة:' : 'By:'} {dt(item.performed_by_name || (isTopup ? 'Mona Finance' : selectedDriverLedgerData.driver?.name))}
+                            {lang === 'ar' ? 'بواسطة:' : 'By:'} {dt(item.performed_by_name || (isTopup ? 'Mona Finance' : selectedDriverLedgerData.driver?.name))}
                           </Text>
                           {item.balance_after !== undefined ? (
                             <Text style={{ color: '#2563eb', fontSize: 11, fontWeight: '800' }}>
