@@ -1384,6 +1384,13 @@ function MainApp() {
   };
 
   const handleCreateOrder = async () => {
+    if (!orderNumber.trim()) {
+      Alert.alert(
+        t('alertError'),
+        lang === 'ar' ? 'رقم الشحنة / الطلب مطلوب!' : 'Order Number / Code is required!'
+      );
+      return;
+    }
     if (!clientAddress.trim() || !orderAmount) {
       Alert.alert(t('alertError'), t('addressRequiredMsg'));
       return;
@@ -2996,9 +3003,9 @@ function MainApp() {
               {editingOrderId ? (lang === 'ar' ? '✏️ تعديل بيانات الشحنة' : '✏️ Edit Order Details') : t('dispatchOrderTitle')}
             </Text>
 
-            {/* Field 1: Order Number (Manual input, replaces auto-generated tracking number) */}
+            {/* Field 1: Order Number (Mandatory manual input) */}
             <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>
-              {lang === 'ar' ? 'رقم الشحنة / الطلب (اختياري)' : 'Order Number / Code (Optional)'}
+              {lang === 'ar' ? 'رقم الشحنة / الطلب *' : 'Order Number / Code *'}
             </Text>
             <TextInput
               style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
