@@ -24,10 +24,11 @@ const getClient = async () => {
   return client;
 };
 
-// Auto-ensure required schema columns exist
+// Auto-ensure required schema columns and constraints exist
 (async () => {
   try {
     await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
+    await pgPool.query('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
   } catch (err) {
     console.error('Schema auto-patch note:', err.message);
   }

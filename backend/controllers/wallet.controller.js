@@ -56,7 +56,7 @@ exports.getWalletsSummary = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching wallets summary:', err);
-    res.status(500).json({ error: 'Server error fetching wallet data.' });
+    res.status(500).json({ error: err.message || 'Server error fetching wallet data.' });
   }
 };
 
@@ -130,7 +130,7 @@ exports.financePullCashOut = async (req, res) => {
       client.release();
     }
     console.error('Error pulling cash out:', err);
-    res.status(500).json({ error: 'Server error pulling cash out.' });
+    res.status(500).json({ error: err.message || 'Server error pulling cash out.' });
   }
 };
 
@@ -194,7 +194,7 @@ exports.financeClearOrderCash = async (req, res) => {
       client.release();
     }
     console.error('Error clearing order cash:', err);
-    res.status(500).json({ error: 'Server error clearing order cash.' });
+    res.status(500).json({ error: err.message || 'Server error clearing order cash.' });
   }
 };
 
@@ -258,7 +258,7 @@ exports.financeTopUpPocketMoney = async (req, res) => {
       client.release();
     }
     console.error('Error topping up pocket money:', err);
-    res.status(500).json({ error: 'Server error topping up pocket money.' });
+    res.status(500).json({ error: err.message || 'Server error topping up pocket money.' });
   }
 };
 
@@ -334,8 +334,12 @@ exports.recordPocketExpense = async (req, res) => {
       new_pocket_balance: newBalance
     });
   } catch (err) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      client.release();
+    }
     console.error('Error recording expense:', err);
-    res.status(500).json({ error: 'Server error recording expense.' });
+    res.status(500).json({ error: err.message || 'Server error recording expense.' });
   }
 };
 
@@ -359,7 +363,7 @@ exports.getExpensesBreakdown = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching breakdown:', err);
-    res.status(500).json({ error: 'Failed to fetch expense breakdown.' });
+    res.status(500).json({ error: err.message || 'Failed to fetch expense breakdown.' });
   }
 };
 

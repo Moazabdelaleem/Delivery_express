@@ -49,7 +49,7 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({ message: 'Order created successfully.', order: newOrder });
   } catch (err) {
     console.error('Error creating order:', err);
-    res.status(500).json({ error: 'Server error creating order.' });
+    res.status(500).json({ error: err.message || 'Server error creating order.' });
   }
 };
 
@@ -87,7 +87,7 @@ exports.updateOrder = async (req, res) => {
     res.json({ message: 'Order updated successfully.', order: updateRes.rows[0] });
   } catch (err) {
     console.error('Error updating order:', err);
-    res.status(500).json({ error: 'Server error updating order.' });
+    res.status(500).json({ error: err.message || 'Server error updating order.' });
   }
 };
 
@@ -107,7 +107,7 @@ exports.deleteOrder = async (req, res) => {
     res.json({ message: 'Order deleted successfully.' });
   } catch (err) {
     console.error('Error deleting order:', err);
-    res.status(500).json({ error: 'Server error deleting order.' });
+    res.status(500).json({ error: err.message || 'Server error deleting order.' });
   }
 };
 
@@ -145,7 +145,7 @@ exports.undoHandoff = async (req, res) => {
     res.json({ message: 'Inventory handoff undone successfully.', order: updateRes.rows[0] });
   } catch (err) {
     console.error('Error undoing inventory handoff:', err);
-    res.status(500).json({ error: 'Server error undoing inventory handoff.' });
+    res.status(500).json({ error: err.message || 'Server error undoing inventory handoff.' });
   }
 };
 
@@ -185,7 +185,7 @@ exports.assignOrder = async (req, res) => {
     res.json({ message: 'Order assigned and inventory notified.', order: updatedOrder });
   } catch (err) {
     console.error('Error assigning order:', err);
-    res.status(500).json({ error: 'Server error assigning order.' });
+    res.status(500).json({ error: err.message || 'Server error assigning order.' });
   }
 };
 
@@ -232,7 +232,7 @@ exports.inventoryHandoff = async (req, res) => {
     res.json({ message: `Order status updated to ${newStatus}`, order: updatedOrder });
   } catch (err) {
     console.error('Error in inventory handoff:', err);
-    res.status(500).json({ error: 'Server error updating inventory handoff.' });
+    res.status(500).json({ error: err.message || 'Server error updating inventory handoff.' });
   }
 };
 
