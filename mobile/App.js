@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Platform,
   Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1571,7 +1572,7 @@ function MainApp() {
       <SafeAreaView style={[styles.container, theme.bg]}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-end', gap: 6, padding: 10 }}>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'flex-end', gap: 6, padding: 10, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 6 : 10 }}>
           <TouchableOpacity style={[styles.themeToggleBtn, theme.inputBg]} onPress={() => setIsDarkMode(!isDarkMode)}>
             <Text style={[styles.themeToggleText, theme.text]}>{isDarkMode ? t('lightMode') : t('darkMode')}</Text>
           </TouchableOpacity>
