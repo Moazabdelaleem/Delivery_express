@@ -284,15 +284,16 @@ exports.updateDeliveryStatus = async (req, res) => {
       ? (parseFloat(cash_amount) || parseFloat(order.order_amount))
       : 0.00;
 
+    const isDelivered = status === 'delivered';
     const updateRes = await client.query(
       `UPDATE orders
        SET status = $1,
            delivery_failure_reason = $2,
            cash_collected = $3,
-           delivered_at = CASE WHEN $1 = 'delivered' THEN NOW() ELSE delivered_at END,
+           delivered_at = CASE WHEN $5 = true THEN NOW() ELSE delivered_at END,
            updated_at = NOW()
        WHERE id = $4 RETURNING *`,
-      [status, failure_reason || null, cashCollected, order_id]
+      [status, failure_reason || null, cashCollected, order_id, isDelivered]
     );
 
     const updatedOrder = updateRes.rows[0];
