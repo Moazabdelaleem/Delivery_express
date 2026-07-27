@@ -1,12 +1,18 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Delivery Express",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4445ee1e-3842-44d6-9b8f-35e1497a8487"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -23,7 +29,8 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-updates"
     ],
     "extra": {
       "eas": {
