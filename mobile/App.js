@@ -1304,7 +1304,7 @@ function MainApp() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ handed_over: true, note: 'Scanned at warehouse bay' })
+        body: JSON.stringify({ handed_over: true })
       });
       if (res.ok) {
         showToast(`📦 ${t('handoffSuccess')}`);
@@ -2402,7 +2402,7 @@ function MainApp() {
                     { id: 'all', label: lang === 'ar' ? 'الكل' : 'All', count: safeOrders.length },
                     { id: 'pending', label: lang === 'ar' ? 'بانتظار التسليم' : 'Queue (Pending)', count: safeOrders.filter(o => o.status === 'assigned' || o.status === 'notified_inventory' || o.status === 'created').length },
                     { id: 'handed', label: lang === 'ar' ? 'تم تسليمها للمندوب' : 'Handed Over', count: safeOrders.filter(o => o.status === 'handed_to_delivery').length },
-                    { id: 'issues', label: lang === 'ar' ? 'بلاغات ومشاكل' : 'Issues / Failed', count: safeOrders.filter(o => o.status === 'pickup_failed' || o.status === 'delivery_failed' || o.inventory_note).length },
+                    { id: 'issues', label: lang === 'ar' ? 'بلاغات ومشاكل' : 'Issues / Failed', count: safeOrders.filter(o => o.status === 'pickup_failed' || o.inventory_note).length },
                     { id: 'completed', label: lang === 'ar' ? 'مكتملة ومسلمة' : 'Delivered / Done', count: safeOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared' || o.status === 'in_transit').length },
                   ].map(f => (
                     <TouchableOpacity
@@ -2439,7 +2439,7 @@ function MainApp() {
                   const filtered = safeOrders.filter(o => {
                     if (inventoryFilter === 'pending') return o.status === 'assigned' || o.status === 'notified_inventory' || o.status === 'created';
                     if (inventoryFilter === 'handed') return o.status === 'handed_to_delivery';
-                    if (inventoryFilter === 'issues') return o.status === 'pickup_failed' || o.status === 'delivery_failed' || o.inventory_note;
+                    if (inventoryFilter === 'issues') return o.status === 'pickup_failed' || o.inventory_note;
                     if (inventoryFilter === 'completed') return o.status === 'delivered' || o.status === 'cash_cleared' || o.status === 'in_transit';
                     return true;
                   });
