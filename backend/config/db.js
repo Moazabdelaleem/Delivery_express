@@ -24,6 +24,15 @@ const getClient = async () => {
   return client;
 };
 
+// Auto-ensure required schema columns exist
+(async () => {
+  try {
+    await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
+  } catch (err) {
+    console.error('Schema auto-patch note:', err.message);
+  }
+})();
+
 module.exports = {
   query,
   getClient,

@@ -347,7 +347,7 @@ exports.updateDeliveryStatus = async (req, res) => {
       client.release();
     }
     console.error('Error updating delivery status:', err);
-    res.status(500).json({ error: 'Server error updating delivery status.' });
+    res.status(500).json({ error: err.message || 'Server error updating delivery status.' });
   }
 };
 
