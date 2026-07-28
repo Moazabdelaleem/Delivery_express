@@ -25,9 +25,11 @@ exports.createOrder = async (req, res) => {
     const cAddress = client_address.trim();
     const cDetails = order_details || 'Standard package';
 
-    const tracking_number = customTracking && customTracking.trim()
-      ? customTracking.trim()
-      : 'ORD-' + Math.floor(100000 + Math.random() * 900000);
+    if (!customTracking || !customTracking.trim()) {
+      return res.status(400).json({ error: 'Order Number / Code is strictly required and must be provided by the supervisor.' });
+    }
+
+    const tracking_number = customTracking.trim();
     const amount           = parseFloat(order_amount) || 0.00;
     const initialStatus    = delivery_guy_id ? 'assigned' : 'created';
 
@@ -49,6 +51,13 @@ exports.createOrder = async (req, res) => {
     res.status(201).json({ message: 'Order created successfully.', order: newOrder });
   } catch (err) {
     console.error('Error creating order:', err);
+    // Handle unique constraint violation for tracking_number
+    if (err.code === '23505' && err.constraint && err.constraint.includes('tracking_number')) {
+      return res.status(409).json({ error: `Order number "${err.detail?.match(/'([^']+)'/)?.[1] || 'provided'}" already exists. Order numbers must be unique.` });
+    }
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'An order with this order number already exists. Please use a unique order number.' });
+    }
     res.status(500).json({ error: err.message || 'Server error creating order.' });
   }
 };
@@ -87,6 +96,9 @@ exports.updateOrder = async (req, res) => {
     res.json({ message: 'Order updated successfully.', order: updateRes.rows[0] });
   } catch (err) {
     console.error('Error updating order:', err);
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'An order with this order number already exists. Order numbers must be unique.' });
+    }
     res.status(500).json({ error: err.message || 'Server error updating order.' });
   }
 };

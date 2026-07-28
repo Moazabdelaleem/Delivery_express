@@ -156,6 +156,9 @@ const translations = {
     noHistory: "No past order history found.",
     amountToCollect: "Price / Collect",
     pickupFromWarehouse: "Picked Up from Warehouse",
+    pickupGoToInventory: "Go to the inventory to pick it up",
+    pickupGoToInventoryMsg: "Please go to the inventory/warehouse to physically pick up this package before confirming.",
+    pickupGoToInventoryConfirm: "I've Picked It Up — Confirm",
     startTransit: " Start Transit",
     deliveredCollect: "Delivered & Collect Cash",
     deliveryFailed: "Delivery Failed",
@@ -344,6 +347,9 @@ const translations = {
     noHistory: "لا يوجد سجل شحنات سابقة.",
     amountToCollect: "المبلغ المطلوب تحصيله",
     pickupFromWarehouse: "استلمت الشحنة من المخزن",
+    pickupGoToInventory: "اذهب للمخزن لاستلام الشحنة",
+    pickupGoToInventoryMsg: "يرجى التوجه إلى المخزن لاستلام الطرد فعلياً قبل تأكيد الاستلام.",
+    pickupGoToInventoryConfirm: "استلمتها — تأكيد",
     startTransit: " بدء خط السير والتوصيل",
     deliveredCollect: "تم التسليم وتحصيل المبلغ",
     deliveryFailed: "فشل التسليم للعميل",
@@ -629,6 +635,7 @@ function MainApp() {
   const [assigneeId, setAssigneeId] = useState('');
 
   const [inventoryFilter, setInventoryFilter] = useState('all');
+  const [execOpsFilter, setExecOpsFilter] = useState('all');
 
   const [failureModal, setFailureModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -1567,6 +1574,16 @@ function MainApp() {
   const grandCollectionCash = safeFinanceWallets.reduce((acc, w) => acc + parseFloat(w.collection_balance || 0), 0);
   const grandSpentExpenses = parseFloat(expensesBreakdown?.grand_total_spent || 0);
 
+  // Exec Ops Board filtered orders (for drill-down filter strip)
+  const execOpsFilteredOrders = safeOrders.filter(o => {
+    if (execOpsFilter === 'active') return o.status !== 'delivered' && o.status !== 'delivery_failed' && o.status !== 'cash_cleared';
+    if (execOpsFilter === 'transit') return o.status === 'in_transit';
+    if (execOpsFilter === 'warehouse') return o.status === 'assigned' || o.status === 'notified_inventory' || o.status === 'handed_to_delivery';
+    if (execOpsFilter === 'done') return o.status === 'delivered' || o.status === 'cash_cleared';
+    if (execOpsFilter === 'failed') return o.status === 'delivery_failed';
+    return true;
+  });
+
   // AUTH SCREENS (not logged in)
   if (!user) {
     return (
@@ -1966,7 +1983,15 @@ function MainApp() {
                       {item.status === 'assigned' || item.status === 'notified_inventory' ? (
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: '#7c3aed', marginTop: 10 }]}
-                          onPress={() => updateDeliveryStatus(item.id, 'handed_to_delivery')}
+                          onPress={() => {
+                            Alert.alert(
+                              t('pickupGoToInventory'),
+                              t('pickupGoToInventoryMsg'),
+                              [
+                                { text: lang === 'ar' ? 'حسناً، فهمت' : 'OK, Got It', style: 'default' }
+                              ]
+                            );
+                          }}
                         >
                           <Text style={styles.actionBtnText}>{t('pickupFromWarehouse')}</Text>
                         </TouchableOpacity>
@@ -2709,7 +2734,11 @@ function MainApp() {
                   <View style={{ gap: 10 }}>
                     {/* Row 1 */}
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
-                      <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14 }]}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setActiveTab('tab3')}
+                        style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14 }]}
+                      >
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}> {t('execFleetCardLabel')}</Text>
                           <Ionicons name="people-outline" size={18} color="rgba(255,255,255,0.8)" />
@@ -2718,9 +2747,14 @@ function MainApp() {
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>
                           {safeDeliveryGuys.filter(g => g.online_status === 'online').length} {t('execOnlineDrivers')}
                         </Text>
-                      </View>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 4 }}>{lang === 'ar' ? '← اضغط للتفاصيل' : 'Tap to drill down →'}</Text>
+                      </TouchableOpacity>
 
-                      <View style={[styles.statCardMini, { backgroundColor: '#7c3aed', flex: 1, padding: 14, borderRadius: 14 }]}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setActiveTab('tab2')}
+                        style={[styles.statCardMini, { backgroundColor: '#7c3aed', flex: 1, padding: 14, borderRadius: 14 }]}
+                      >
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execOrdersCardLabel')}</Text>
                           <Ionicons name="cube-outline" size={18} color="rgba(255,255,255,0.8)" />
@@ -2729,28 +2763,39 @@ function MainApp() {
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>
                           {historyOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length} {t('execCompletedOrders')}
                         </Text>
-                      </View>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 4 }}>{lang === 'ar' ? '← اضغط للتفاصيل' : 'Tap to drill down →'}</Text>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Row 2 */}
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
-                      <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14 }]}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setActiveTab('tab3')}
+                        style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14 }]}
+                      >
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execCashCardLabel')}</Text>
                           <Ionicons name="wallet-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 4 }]}>${grandCollectionCash.toFixed(2)}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{t('execCashLiability')}</Text>
-                      </View>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 4 }}>{lang === 'ar' ? '← اضغط للتفاصيل' : 'Tap to drill down →'}</Text>
+                      </TouchableOpacity>
 
-                      <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 14, borderRadius: 14 }]}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setActiveTab('tab4')}
+                        style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 14, borderRadius: 14 }]}
+                      >
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '800' }}>{t('execExpensesCardLabel')}</Text>
                           <Ionicons name="receipt-outline" size={18} color="rgba(255,255,255,0.8)" />
                         </View>
                         <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 4 }]}>${grandSpentExpenses.toFixed(2)}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10, marginTop: 2 }}>{t('execExpensesSpent')}</Text>
-                      </View>
+                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9, marginTop: 4 }}>{lang === 'ar' ? '← اضغط للتفاصيل' : 'Tap to drill down →'}</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
@@ -2758,28 +2803,45 @@ function MainApp() {
                 {/* Department Quick Summaries */}
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execDepartmentOverviews')}</Text>
 
-                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentBlue]} onPress={() => setActiveTab('tab2')}>
-                  <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execSupervisorDeptTitle')}</Text>
-                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 4 }, isRTL && styles.rtlText]}>
-                    {t('execActiveOrders')}: {activeOrders.length} | {t('execInTransit')}: {safeOrders.filter(o => o.status === 'in_transit').length}
+                {/* Supervisor Dept Card — navigates to Tab 2 (Ops) */}
+                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentBlue]} onPress={() => setActiveTab('tab2')} activeOpacity={0.85}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execSupervisorDeptTitle')}</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#2563eb" />
+                  </View>
+                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
+                    {t('execActiveOrders')}: <Text style={{ color: '#2563eb', fontWeight: '800' }}>{activeOrders.length}</Text>
+                    {'  |  '}{t('execInTransit')}: <Text style={{ color: '#f59e0b', fontWeight: '800' }}>{safeOrders.filter(o => o.status === 'in_transit').length}</Text>
+                    {'  |  '}{lang === 'ar' ? 'مكتملة' : 'Done'}: <Text style={{ color: '#10b981', fontWeight: '800' }}>{safeOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length}</Text>
                   </Text>
-                  <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>{t('execTapOpsBoard')}</Text>
+                  <Text style={[{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>{t('execTapOpsBoard')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentAmber]} onPress={() => setActiveTab('tab2')}>
-                  <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execWarehouseDeptTitle')}</Text>
-                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 4 }, isRTL && styles.rtlText]}>
-                    {t('execPendingHandoff')}: {inventoryQueue.length} | {t('execReportedIssues')}: {inventoryIssues.length}
+                {/* Warehouse Dept Card — navigates to Tab 2 (Ops Board shows all including warehouse statuses) */}
+                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentAmber]} onPress={() => setActiveTab('tab2')} activeOpacity={0.85}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execWarehouseDeptTitle')}</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#f59e0b" />
+                  </View>
+                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
+                    {t('execPendingHandoff')}: <Text style={{ color: '#f59e0b', fontWeight: '800' }}>{inventoryQueue.length}</Text>
+                    {'  |  '}{t('execReportedIssues')}: <Text style={{ color: '#ef4444', fontWeight: '800' }}>{inventoryIssues.length}</Text>
                   </Text>
-                  <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>{t('execTapWarehouseQueue')}</Text>
+                  <Text style={[{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>{t('execTapWarehouseQueue')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentEmerald]} onPress={() => setActiveTab('tab3')}>
-                  <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execFinanceDeptTitle')}</Text>
-                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 4 }, isRTL && styles.rtlText]}>
-                    {t('execDriversMonitored')}: {safeFinanceWallets.length} | {t('execCashSettled')}: ${grandCollectionCash.toFixed(2)}
+                {/* Finance Dept Card — navigates to Tab 3 (Fleet/Wallets) */}
+                <TouchableOpacity style={[styles.orderCard, theme.cardBg, styles.statCardAccentEmerald]} onPress={() => setActiveTab('tab3')} activeOpacity={0.85}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text style={[styles.trackingNum, theme.text, isRTL && styles.rtlText]}>{t('execFinanceDeptTitle')}</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#059669" />
+                  </View>
+                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
+                    {t('execDriversMonitored')}: <Text style={{ color: '#059669', fontWeight: '800' }}>{safeFinanceWallets.length}</Text>
+                    {'  |  '}{t('execCashSettled')}: <Text style={{ color: '#059669', fontWeight: '800' }}>${grandCollectionCash.toFixed(2)}</Text>
+                    {'  |  '}{lang === 'ar' ? 'مصاريف' : 'Expenses'}: <Text style={{ color: '#ef4444', fontWeight: '800' }}>${grandSpentExpenses.toFixed(2)}</Text>
                   </Text>
-                  <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>{t('execTapFleetWallets')}</Text>
+                  <Text style={[{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>{t('execTapFleetWallets')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -2788,10 +2850,40 @@ function MainApp() {
             {activeTab === 'tab2' && (
               <View>
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('execAllOpsTitle')}</Text>
-                {safeOrders.length === 0 ? (
+
+                {/* Exec Ops Board Filter Strip */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 12, paddingHorizontal: 2 }}>
+                  {[
+                    { id: 'all', label: lang === 'ar' ? 'الكل' : 'All', count: safeOrders.length, color: '#64748b' },
+                    { id: 'active', label: lang === 'ar' ? 'نشط' : 'Active', count: activeOrders.length, color: '#2563eb' },
+                    { id: 'transit', label: lang === 'ar' ? 'بالطريق' : 'Transit', count: safeOrders.filter(o => o.status === 'in_transit').length, color: '#d97706' },
+                    { id: 'warehouse', label: lang === 'ar' ? 'بالمخزن' : 'Warehouse', count: inventoryQueue.length, color: '#7c3aed' },
+                    { id: 'done', label: lang === 'ar' ? 'مكتمل' : 'Done', count: safeOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length, color: '#059669' },
+                    { id: 'failed', label: lang === 'ar' ? 'فشل' : 'Failed', count: safeOrders.filter(o => o.status === 'delivery_failed').length, color: '#ef4444' },
+                  ].map(f => (
+                    <TouchableOpacity
+                      key={f.id}
+                      onPress={() => setExecOpsFilter(f.id)}
+                      style={{
+                        backgroundColor: execOpsFilter === f.id ? f.color : (isDarkMode ? '#1e293b' : '#f1f5f9'),
+                        borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+                        flexDirection: 'row', alignItems: 'center', gap: 6,
+                        borderWidth: 1.5,
+                        borderColor: execOpsFilter === f.id ? f.color : (isDarkMode ? '#334155' : '#cbd5e1')
+                      }}
+                    >
+                      <Text style={{ color: execOpsFilter === f.id ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569'), fontSize: 12, fontWeight: '800' }}>{f.label}</Text>
+                      <View style={{ backgroundColor: execOpsFilter === f.id ? 'rgba(255,255,255,0.25)' : f.color, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                        <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '900' }}>{f.count}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {execOpsFilteredOrders.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : (
-                  safeOrders.map((o) => (
+                  execOpsFilteredOrders.map((o) => (
                     <TouchableOpacity
                       key={o.id}
                       activeOpacity={0.85}
@@ -2815,8 +2907,8 @@ function MainApp() {
                           </Text>
                         ) : null}
                       </View>
-                      <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>
-                        {lang === 'ar' ? 'اضغط لعرض مسار وتاريخ الشحنة بالكامل' : 'Tap to inspect full order journey'}
+                      <Text style={[{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 6 }, isRTL && styles.rtlText]}>
+                        {lang === 'ar' ? 'اضغط لعرض مسار وتاريخ الشحنة بالكامل' : 'Tap to inspect full order journey →'}
                       </Text>
                     </TouchableOpacity>
                   ))
@@ -3119,10 +3211,13 @@ function MainApp() {
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#7c3aed' }]}
                   onPress={() => {
-                    const id = selectedOrderForStatus.id;
-                    setOrderStatusModal(false);
-                    setSelectedOrderForStatus(null);
-                    updateDeliveryStatus(id, 'handed_to_delivery');
+                    Alert.alert(
+                      t('pickupGoToInventory'),
+                      t('pickupGoToInventoryMsg'),
+                      [
+                        { text: lang === 'ar' ? 'حسناً، فهمت' : 'OK, Got It', style: 'default' }
+                      ]
+                    );
                   }}
                 >
                   <Text style={styles.actionBtnText}>{t('pickupFromWarehouse')}</Text>
@@ -3191,9 +3286,9 @@ function MainApp() {
       {/* DRIVER STATS & BUDGET MODAL */}
       <Modal visible={driverStatsModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, theme.cardBg]}>
+          <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             {selectedDriverForStats ? (
-              <View>
+              <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
                     {dt(selectedDriverForStats.name || selectedDriverForStats.delivery_guy_name)}
@@ -3212,8 +3307,11 @@ function MainApp() {
                 </Text>
                 {(() => {
                   const driverId = selectedDriverForStats.id || selectedDriverForStats.delivery_guy_id;
-                  const totalAssigned = safeOrders.filter(o => o.delivery_guy_id === driverId).length;
-                  const completedCount = safeOrders.filter(o => o.delivery_guy_id === driverId && (o.status === 'delivered' || o.status === 'cash_cleared')).length;
+                  const driverOrders = safeOrders.filter(o => o.delivery_guy_id === driverId);
+                  const totalAssigned = driverOrders.length;
+                  const completedCount = driverOrders.filter(o => o.status === 'delivered' || o.status === 'cash_cleared').length;
+                  const inTransitCount = driverOrders.filter(o => o.status === 'in_transit').length;
+                  const failedCount = driverOrders.filter(o => o.status === 'delivery_failed').length;
 
                   const driverWallet = getDriverWallet(driverId || selectedDriverForStats.username);
                   const colBal = driverWallet.collection_balance;
@@ -3221,16 +3319,26 @@ function MainApp() {
 
                   return (
                     <View>
-                      {/* KPI Row */}
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginBottom: 14 }}>
-                        <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'إجمالي الإسناد' : 'TOTAL ASSIGNED'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 26, marginTop: 4 }]}>{totalAssigned}</Text>
+                      {/* KPI Row - Extended */}
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                        <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'الكل' : 'TOTAL'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{totalAssigned}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 14, borderRadius: 14, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'تم التسليم' : 'COMPLETED'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 26, marginTop: 4 }]}>{completedCount}</Text>
+                        <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'مكتمل' : 'DONE'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{completedCount}</Text>
                         </View>
+                        <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'بالطريق' : 'TRANSIT'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{inTransitCount}</Text>
+                        </View>
+                        {failedCount > 0 && (
+                          <View style={[styles.statCardMini, { backgroundColor: '#ef4444', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
+                            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'فشل' : 'FAILED'}</Text>
+                            <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{failedCount}</Text>
+                          </View>
+                        )}
                       </View>
 
                       {/* Wallet Section */}
@@ -3241,7 +3349,7 @@ function MainApp() {
                         backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
                         padding: 14, borderRadius: 14,
                         borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1',
-                        gap: 10
+                        gap: 10, marginBottom: 16
                       }}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
@@ -3257,10 +3365,54 @@ function MainApp() {
                           <Text style={{ color: pockBal < 0 ? '#ef4444' : '#2563eb', fontWeight: '900', fontSize: 15 }}>${pockBal.toFixed(2)}</Text>
                         </View>
                       </View>
+
+                      {/* Driver's Orders Drill-Down List */}
+                      <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginBottom: 10 }, isRTL && styles.rtlText]}>
+                        {lang === 'ar' ? 'شحنات هذا المندوب (اضغط لعرض مسار الشحنة):' : "Driver's Orders — Tap to inspect:"}
+                      </Text>
+                      {driverOrders.length === 0 ? (
+                        <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
+                      ) : (
+                        driverOrders.map(o => (
+                          <TouchableOpacity
+                            key={o.id}
+                            activeOpacity={0.85}
+                            style={{
+                              backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                              borderRadius: 10,
+                              padding: 12,
+                              marginBottom: 8,
+                              borderLeftWidth: 4,
+                              borderLeftColor: getStatusColor(o.status),
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? '#334155' : '#e2e8f0'
+                            }}
+                            onPress={() => {
+                              setDriverStatsModal(false);
+                              setSelectedDriverForStats(null);
+                              openOrderAuditModal(o);
+                            }}
+                          >
+                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={{ color: '#2563eb', fontWeight: '800', fontSize: 13 }}>#{o.tracking_number}</Text>
+                              <Text style={[styles.statusTag, { backgroundColor: getStatusColor(o.status), fontSize: 10 }]}>{tStatus(o.status)}</Text>
+                            </View>
+                            <Text style={[theme.text, { fontSize: 12, fontWeight: '600', marginTop: 4 }, isRTL && styles.rtlText]} numberOfLines={1}>
+                              {dt(o.client_address)}
+                            </Text>
+                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                              <Text style={{ color: '#059669', fontSize: 13, fontWeight: '900' }}>${parseFloat(o.order_amount || 0).toFixed(2)}</Text>
+                              <Text style={{ color: '#6366f1', fontSize: 10, fontWeight: '700' }}>
+                                {lang === 'ar' ? 'اضغط لعرض المسار' : 'Tap to view journey →'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))
+                      )}
                     </View>
                   );
                 })()}
-              </View>
+              </ScrollView>
             ) : null}
 
             <TouchableOpacity style={[styles.cancelButton, { marginTop: 18 }]} onPress={() => { setDriverStatsModal(false); setSelectedDriverForStats(null); }}>
@@ -3596,24 +3748,33 @@ function MainApp() {
                   ).map((item, idx) => {
                     const isTopup = item.transaction_type === 'finance_topup' || item.type === 'topup' || (!item.reason && item.amount > 0);
                     const amt = parseFloat(item.amount || 0);
+                    const ledgerColor = isTopup ? '#10b981' : '#ef4444';
+                    const ledgerBgColor = isTopup
+                      ? (isDarkMode ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.06)')
+                      : (isDarkMode ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.06)');
                     return (
                       <View
                         key={item.id || idx}
                         style={{
-                          backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                          backgroundColor: ledgerBgColor,
                           padding: 12,
                           borderRadius: 10,
                           marginBottom: 8,
                           borderLeftWidth: 4,
-                          borderLeftColor: isTopup ? '#10b981' : '#ef4444',
+                          borderLeftColor: ledgerColor,
                           borderWidth: 1,
                           borderColor: isDarkMode ? '#334155' : '#e2e8f0'
                         }}
                       >
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '900', color: isTopup ? '#10b981' : '#ef4444' }}>
-                              {isTopup ? '+ $' + amt.toFixed(2) + ' (Top-Up)' : '- $' + amt.toFixed(2) + ' (Expense)'}
+                            <View style={{ backgroundColor: ledgerColor, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '900', color: '#ffffff' }}>
+                                {isTopup ? '+ $' + amt.toFixed(2) : '- $' + amt.toFixed(2)}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: ledgerColor }}>
+                              {isTopup ? (lang === 'ar' ? 'ايداع' : 'TOP-UP') : (lang === 'ar' ? 'مصروف' : 'SPENT')}
                             </Text>
                           </View>
                           <Text style={[theme.textMuted, { fontSize: 11 }]}>
