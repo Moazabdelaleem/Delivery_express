@@ -14,7 +14,11 @@
       "url": "https://u.expo.dev/4445ee1e-3842-44d6-9b8f-35e1497a8487"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "yes",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.moazz55.deliveryexpress",
