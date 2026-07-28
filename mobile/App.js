@@ -1872,7 +1872,7 @@ function MainApp() {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
       {/* Top Header */}
-      <View style={[styles.appHeader, theme.cardBg, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
+      <View style={[styles.appHeader, theme.cardBg, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 12 }]}>
         <View style={{ flex: 1, minWidth: 120, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
           <Text style={[styles.headerUser, theme.text]}>{dt(user.name)}</Text>
           <Text style={styles.headerRoleBadge}>{t(user.role) || user.role.replace('_', ' ').toUpperCase()}</Text>
@@ -3710,7 +3710,7 @@ const styles = StyleSheet.create({
   switchAuthText: { fontSize: 13, fontWeight: '700' },
   errorBox: { backgroundColor: 'rgba(239,68,68,0.15)', padding: 12, borderRadius: 10, marginBottom: 12, borderWidth: 1, borderColor: '#ef4444' },
   errorText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
-  appHeader: { paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', alignItems: 'center' },
+  appHeader: { paddingHorizontal: 15, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0', alignItems: 'center' },
   headerUser: { fontSize: 16, fontWeight: '800' },
   headerRoleBadge: { color: '#2563eb', fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
   logoutBtn: { backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
