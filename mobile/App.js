@@ -3000,6 +3000,7 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: '#7c3aed' }]}>
                           {m.role ? m.role.replace('_', ' ').toUpperCase() : 'USER'}
                         </Text>
+                      </View>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: '#10b981', flex: 1, minWidth: 120 }]}
