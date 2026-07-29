@@ -3288,14 +3288,16 @@ function MainApp() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             {selectedDriverForStats ? (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+                  <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, flex: 1, marginRight: 8 }, isRTL && styles.rtlText]}>
                     {dt(selectedDriverForStats.name || selectedDriverForStats.delivery_guy_name)}
                   </Text>
-                  <Text style={[styles.statusTag, { backgroundColor: selectedDriverForStats.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
-                    {selectedDriverForStats.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
-                  </Text>
+                  <View style={{ backgroundColor: selectedDriverForStats.online_status === 'online' ? '#10b981' : '#6b7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>
+                      {selectedDriverForStats.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
+                    </Text>
+                  </View>
                 </View>
 
                 <Text style={[theme.textMuted, { fontSize: 13, marginBottom: 12 }, isRTL && styles.rtlText]}>
@@ -3320,25 +3322,23 @@ function MainApp() {
                   return (
                     <View>
                       {/* KPI Row - Extended */}
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                        <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'الكل' : 'TOTAL'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{totalAssigned}</Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6, marginBottom: 16, width: '100%' }}>
+                        <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'الكل' : 'TOTAL'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{totalAssigned}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'مكتمل' : 'DONE'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{completedCount}</Text>
+                        <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'مكتمل' : 'DONE'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{completedCount}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
-                          <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'بالطريق' : 'TRANSIT'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{inTransitCount}</Text>
+                        <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'بالطريق' : 'TRANSIT'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{inTransitCount}</Text>
                         </View>
-                        {failedCount > 0 && (
-                          <View style={[styles.statCardMini, { backgroundColor: '#ef4444', flex: 1, minWidth: 70, padding: 12, borderRadius: 12, alignItems: 'center' }]}>
-                            <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9, fontWeight: '700' }}>{lang === 'ar' ? 'فشل' : 'FAILED'}</Text>
-                            <Text style={[styles.statCardMiniVal, { fontSize: 22, marginTop: 2 }]}>{failedCount}</Text>
-                          </View>
-                        )}
+                        <View style={[styles.statCardMini, { backgroundColor: '#ef4444', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'فشل' : 'FAILED'}</Text>
+                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{failedCount}</Text>
+                        </View>
                       </View>
 
                       {/* Wallet Section */}
