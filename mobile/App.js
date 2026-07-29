@@ -2932,27 +2932,34 @@ function MainApp() {
                       style={[styles.orderCard, theme.cardBg, styles.statCardAccentEmerald]}
                       onPress={() => openDriverStatsModal(g)}
                     >
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 150 }}>
                           <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
-                          <Text style={[styles.clientName, theme.text]}>{dt(g.delivery_guy_name || g.name)} (@{g.username || 'driver'})</Text>
+                          <Text style={[styles.clientName, theme.text, { flexShrink: 1 }]} numberOfLines={1}>
+                            {dt(g.delivery_guy_name || g.name)} (@{g.username || 'driver'})
+                          </Text>
                         </View>
-                        <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
-                          {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
-                        </Text>
+                        <View style={{ backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start' }}>
+                          <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
+                            {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
+                          </Text>
+                        </View>
                       </View>
 
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
-                        <View style={[styles.walletCard, { backgroundColor: '#059669', flex: 1, minWidth: 130, padding: 10 }]}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, width: '100%' }}>
+                        <View style={{ backgroundColor: '#059669', flex: 1, padding: 10, borderRadius: 10 }}>
                           <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>{t('execCollectionCash')}</Text>
                           <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', marginTop: 2 }}>${collectionBal.toFixed(2)}</Text>
                         </View>
 
-                        <View style={[styles.walletCard, { backgroundColor: pocketBal < 0 ? '#dc2626' : '#2563eb', flex: 1, minWidth: 130, padding: 10 }]}>
+                        <View style={{ backgroundColor: pocketBal < 0 ? '#dc2626' : '#2563eb', flex: 1, padding: 10, borderRadius: 10 }}>
                           <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>{t('execPocketAllowance')}</Text>
                           <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: '900', marginTop: 2 }}>${pocketBal.toFixed(2)}</Text>
                         </View>
                       </View>
+                      <Text style={{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 8, textAlign: isRTL ? 'right' : 'left' }}>
+                        {lang === 'ar' ? 'اضغط لعرض كامل بيانات المندوب ←' : 'Tap to inspect full driver profile →'}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
