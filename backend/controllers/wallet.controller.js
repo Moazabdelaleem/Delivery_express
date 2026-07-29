@@ -49,7 +49,7 @@ exports.getWalletsSummary = async (req, res) => {
               COALESCE(p.total_spent, 0.00) as total_spent
        FROM users u
        LEFT JOIN pocket_wallets p ON u.id = p.delivery_guy_id
-       WHERE u.role = 'delivery_guy'
+       WHERE u.role = 'delivery_guy' AND u.is_approved = true
        ORDER BY u.name ASC`
     );
 
@@ -389,7 +389,7 @@ exports.getDriverWalletLedger = async (req, res) => {
       'SELECT * FROM pocket_wallets WHERE delivery_guy_id = $1',
       [delivery_guy_id]
     );
-    const pocket = pocketRes.rows[0] || { current_balance: 50.00, total_topped_up: 50.00, total_spent: 0.00 };
+    const pocket = pocketRes.rows[0] || { current_balance: 0.00, total_topped_up: 0.00, total_spent: 0.00 };
 
     const expensesRes = await db.query(
       `SELECT e.*, u.name as delivery_guy_name
@@ -412,8 +412,8 @@ exports.getDriverWalletLedger = async (req, res) => {
     res.json({
       driver: { id: driver.id, name: driver.name, username: driver.username, phone: driver.phone },
       pocket_wallet: {
-        current_balance: parseFloat(pocket.current_balance || 50.00),
-        total_topped_up: parseFloat(pocket.total_topped_up || 50.00),
+        current_balance: parseFloat(pocket.current_balance || 0.00),
+        total_topped_up: parseFloat(pocket.total_topped_up || 0.00),
         total_spent:     parseFloat(pocket.total_spent || 0.00)
       },
       expenses:     expensesRes.rows,

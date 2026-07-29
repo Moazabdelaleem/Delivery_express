@@ -71,18 +71,12 @@ exports.register = async (req, res) => {
 
     const newUser = result.rows[0];
 
-    // Auto-create wallets for Delivery Guys (with $50.00 initial pocket allowance)
+    // Auto-create wallets for Delivery Guys (starts at 0.00 allowance)
     if (role === 'delivery_guy') {
       await db.query(`INSERT INTO collection_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING`, [newUser.id]);
       await db.query(`INSERT INTO pocket_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING`, [newUser.id]);
       await db.query(
-        `UPDATE pocket_wallets SET current_balance = 50.00, total_topped_up = 50.00, total_spent = 0.00 WHERE delivery_guy_id = $1`,
-        [newUser.id]
-      );
-      await db.query(
-        `INSERT INTO wallet_transactions
-           (wallet_type, delivery_guy_id, transaction_type, amount, balance_after, performed_by, notes_or_reason)
-         VALUES ('pocket', $1, 'finance_topup', 50.00, 50.00, $1, 'Initial Seed Top-Up')`,
+        `UPDATE pocket_wallets SET current_balance = 0.00, total_topped_up = 0.00, total_spent = 0.00 WHERE delivery_guy_id = $1`,
         [newUser.id]
       );
     }
@@ -196,7 +190,8 @@ exports.approveUser = async (req, res) => {
 exports.rejectUser = async (req, res) => {
   try {
     const { id } = req.params;
-    await db.query(`DELETE FROM users WHERE id = $1 AND is_approved = false`, [id]);
+    const cleanId = parseInt(id, 10) || id;
+    await db.query(`DELETE FROM users WHERE id = $1`, [cleanId]);
     res.json({ message: 'Pending user account rejected and removed.' });
   } catch (err) {
     console.error('Error rejecting user:', err);
@@ -235,7 +230,7 @@ exports.getUsersByRole = async (req, res) => {
     const { role } = req.params;
     const cleanRole = String(role).toLowerCase().trim();
     const result = await db.query(
-      `SELECT id, username, name, role, online_status, phone FROM users WHERE LOWER(TRIM(role)) = $1 ORDER BY name ASC`,
+      `SELECT id, username, name, role, online_status, phone FROM users WHERE LOWER(TRIM(role)) = $1 AND is_approved = true ORDER BY name ASC`,
       [cleanRole]
     );
     res.json(result.rows);

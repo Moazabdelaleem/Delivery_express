@@ -571,7 +571,7 @@ function MainApp() {
   const [sharedWalletsMap, setSharedWalletsMap] = useState({});
 
   const getDriverWallet = (driverKey) => {
-    if (!driverKey) return { collection_balance: 0, pocket_balance: 50, total_topped_up: 50, total_spent: 0 };
+    if (!driverKey) return { collection_balance: 0, pocket_balance: 0, total_topped_up: 0, total_spent: 0 };
     const key = String(driverKey).toLowerCase();
     const entry = sharedWalletsMap[key] || Object.values(sharedWalletsMap).find(w =>
       String(w.id || '').toLowerCase() === key ||
@@ -582,8 +582,8 @@ function MainApp() {
 
     return {
       collection_balance: entry?.collection_balance !== undefined ? parseFloat(entry.collection_balance) : 0.00,
-      pocket_balance: entry?.pocket_balance !== undefined ? parseFloat(entry.pocket_balance) : 50.00,
-      total_topped_up: entry?.total_topped_up !== undefined ? parseFloat(entry.total_topped_up) : 50.00,
+      pocket_balance: entry?.pocket_balance !== undefined ? parseFloat(entry.pocket_balance) : 0.00,
+      total_topped_up: entry?.total_topped_up !== undefined ? parseFloat(entry.total_topped_up) : 0.00,
       total_spent: entry?.total_spent !== undefined ? parseFloat(entry.total_spent) : 0.00
     };
   };
@@ -2296,9 +2296,6 @@ function MainApp() {
                         {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
                       </Text>
                     </View>
-                    <Text style={[styles.orderDetail, theme.textMuted, { marginTop: 6, fontSize: 13 }, isRTL && styles.rtlText]}>
-                      {g.phone || 'N/A'}
-                    </Text>
                     <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>
                       {lang === 'ar' ? 'اضغط لعرض إحصائيات الأداء وميزانية العهدة ' : 'Tap to view performance stats & wallet budget '}
                     </Text>
@@ -3003,8 +3000,6 @@ function MainApp() {
                         <Text style={[styles.statusTag, { backgroundColor: '#7c3aed' }]}>
                           {m.role ? m.role.replace('_', ' ').toUpperCase() : 'USER'}
                         </Text>
-                      </View>
-                      <Text style={[styles.orderDetail, theme.textMuted, isRTL && styles.rtlText, { marginTop: 4 }]}>{m.phone || 'N/A'}</Text>
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: '#10b981', flex: 1, minWidth: 120 }]}
@@ -3308,7 +3303,7 @@ function MainApp() {
                 </View>
 
                 <Text style={[theme.textMuted, { fontSize: 13, marginBottom: 12 }, isRTL && styles.rtlText]}>
-                  {lang === 'ar' ? 'رقم الهاتف:' : 'Phone:'} {selectedDriverForStats.phone || 'N/A'} | @{selectedDriverForStats.username || 'driver'}
+                  @{selectedDriverForStats.username || 'driver'}
                 </Text>
 
                 <Text style={[styles.sectionTitle, theme.text, { fontSize: 15, marginBottom: 8 }, isRTL && styles.rtlText]}>
@@ -3541,9 +3536,9 @@ function MainApp() {
 
             {selectedOrderForAudit ? (
               <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0', marginBottom: 12, gap: 6 }}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
-                    {dt(selectedOrderForAudit.client_name)} {selectedOrderForAudit.client_phone ? `(${selectedOrderForAudit.client_phone})` : ''}
+                    {lang === 'ar' ? 'بيانات الشحنة:' : 'Order Details:'}
                   </Text>
                   <Text style={[{ color: '#059669', fontWeight: '900', fontSize: 16 }]}>
                     ${parseFloat(selectedOrderForAudit.order_amount || 0).toFixed(2)}
@@ -3713,9 +3708,6 @@ function MainApp() {
                 <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', marginBottom: 14 }}>
                   <Text style={[theme.text, { fontSize: 15, fontWeight: '800' }, isRTL && styles.rtlText]}>
                     {dt(selectedDriverLedgerData.driver?.name)} (@{selectedDriverLedgerData.driver?.username})
-                  </Text>
-                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }, isRTL && styles.rtlText]}>
-                    {selectedDriverLedgerData.driver?.phone || 'N/A'}
                   </Text>
 
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', gap: 6, flexWrap: 'wrap' }}>
@@ -3927,8 +3919,8 @@ const styles = StyleSheet.create({
   modalCard: { width: '92%', maxWidth: 440, padding: 22, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
   modalTitle: { fontSize: 18, fontWeight: '800', marginBottom: 14 },
   multilineInput: { height: 75, textAlignVertical: 'top', paddingTop: 10 },
-  cancelButton: { marginTop: 10, paddingVertical: 12, alignItems: 'center' },
-  cancelButtonText: { color: '#64748b', fontSize: 14, fontWeight: '700' },
+  cancelButton: { marginTop: 10, paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1.5, borderColor: '#64748b', backgroundColor: 'rgba(100,116,139,0.06)' },
+  cancelButtonText: { color: '#475569', fontSize: 14, fontWeight: '800' },
   driverChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#cbd5e1', backgroundColor: '#f8fafc' },
   driverChipActive: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
   driverChipText: { fontSize: 12, fontWeight: '700', color: '#334155' },
