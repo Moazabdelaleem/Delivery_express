@@ -7,11 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "runtimeVersion": {
-      "policy": "fingerprint"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/4445ee1e-3842-44d6-9b8f-35e1497a8487"
+      "url": "https://u.expo.dev/4445ee1e-3842-44d6-9b8f-35e1497a8487",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
     },
     "ios": {
       "supportsTablet": true,
