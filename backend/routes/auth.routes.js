@@ -6,10 +6,10 @@ const roleCheck = require('../middleware/roleCheck');
 
 const rateLimit = require('express-rate-limit');
 
-// Rate limiter for Auth routes (10 requests per 15 mins)
+// Rate limiter for Auth routes (100 requests per 15 mins)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   message: { error: 'Too many attempts, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,

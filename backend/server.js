@@ -11,6 +11,7 @@ const orderRoutes = require('./routes/order.routes');
 const walletRoutes = require('./routes/wallet.routes');
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Dynamic Origin Configuration for Production & Development
