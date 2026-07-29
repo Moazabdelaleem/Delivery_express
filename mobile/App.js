@@ -3323,26 +3323,26 @@ function MainApp() {
                     <View>
                       {/* KPI Row - Extended */}
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6, marginBottom: 16, width: '100%' }}>
-                        <View style={[styles.statCardMini, { backgroundColor: '#2563eb', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                        <View style={{ backgroundColor: '#2563eb', flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'الكل' : 'TOTAL'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{totalAssigned}</Text>
+                          <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 2, fontWeight: '900' }}>{totalAssigned}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#059669', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                        <View style={{ backgroundColor: '#059669', flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'مكتمل' : 'DONE'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{completedCount}</Text>
+                          <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 2, fontWeight: '900' }}>{completedCount}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#d97706', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                        <View style={{ backgroundColor: '#d97706', flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'بالطريق' : 'TRANSIT'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{inTransitCount}</Text>
+                          <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 2, fontWeight: '900' }}>{inTransitCount}</Text>
                         </View>
-                        <View style={[styles.statCardMini, { backgroundColor: '#ef4444', flex: 1, padding: 8, borderRadius: 8, alignItems: 'center' }]}>
+                        <View style={{ backgroundColor: '#ef4444', flex: 1, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center' }}>
                           <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 9, fontWeight: '800' }}>{lang === 'ar' ? 'فشل' : 'FAILED'}</Text>
-                          <Text style={[styles.statCardMiniVal, { fontSize: 16, marginTop: 2, fontWeight: '900' }]}>{failedCount}</Text>
+                          <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 2, fontWeight: '900' }}>{failedCount}</Text>
                         </View>
                       </View>
 
                       {/* Wallet Section */}
-                      <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginBottom: 10 }, isRTL && styles.rtlText]}>
+                      <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginTop: 4, marginBottom: 10 }, isRTL && styles.rtlText]}>
                         {lang === 'ar' ? 'الميزانية والمحافظ' : 'Wallet Budget & Cash'}
                       </Text>
                       <View style={{
