@@ -2,7 +2,7 @@
   "expo": {
     "name": "Delivery Express",
     "slug": "mobile",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,12 +17,25 @@
       "supportsTablet": true,
       "bundleIdentifier": "yes",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Delivery Express uses your location to confirm warehouse attendance and show route navigation.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Delivery Express requires background location access to provide real-time package delivery tracking to supervisors while you are on duty.",
+        "NSLocationAlwaysUsageDescription": "Delivery Express requires background location access to track active delivery routes.",
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
       "package": "com.moazz55.deliveryexpress",
-      "versionCode": 3,
+      "versionCode": 4,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -35,7 +48,18 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-updates"
+      "expo-updates",
+      "expo-notifications",
+      "expo-system-ui",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Delivery Express requires background location access to provide real-time package delivery tracking to supervisors while you are on duty.",
+          "locationAlwaysPermission": "Delivery Express requires background location access to track active delivery routes.",
+          "locationWhenInUsePermission": "Delivery Express uses your location to confirm warehouse attendance and show route navigation.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
     ],
     "extra": {
       "eas": {

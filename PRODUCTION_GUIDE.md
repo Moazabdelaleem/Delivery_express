@@ -58,8 +58,10 @@ EXPO_PUBLIC_API_URL=https://api.yourdomain.com/api
 ```bash
 cd backend
 npm install --production
+npm run migrate
 npm start
 ```
+
 
 ### B. Frontend Web Deployment (Vite / Static Web Hosting)
 ```bash

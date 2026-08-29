@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger } from '../api.js';
 import { toast } from '../App.jsx';
-
-const STATUS_LABEL = {
-  created: 'Created', assigned: 'Assigned', notified_inventory: 'Notified Inv.',
-  handed_to_delivery: 'Handed Over', pickup_failed: 'Pickup Failed',
-  in_transit: 'In Transit', delivered: 'Delivered', delivery_failed: 'Failed',
-  returned_to_company: 'Returned', cash_cleared: 'Cash Cleared',
-};
+import { STATUS_LABEL } from '../constants/statusLabels.js';
 
 export default function ManagerView({ token }) {
   const [orders, setOrders]       = useState([]);
@@ -100,7 +94,7 @@ export default function ManagerView({ token }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="section-header">
         <div>
           <h1 className="section-title">Executive Dashboard</h1>
           <p className="section-sub">Full system overview — read-only except approvals and system actions</p>
@@ -176,13 +170,13 @@ export default function ManagerView({ token }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Tracking</th><th>Client</th><th>Driver</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                <tr><th>Tracking</th><th>Address</th><th>Driver</th><th>Amount</th><th>Status</th><th>Date</th></tr>
               </thead>
               <tbody>
                 {filtered.map(o => (
                   <tr key={o.id}>
                     <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>{o.tracking_number}</td>
-                    <td>{o.client_name}</td>
+                    <td style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>{o.client_address}</td>
                     <td>{o.delivery_guy_name || <span style={{ color: 'var(--clr-text-dim)' }}>—</span>}</td>
                     <td className="amount">EGP {parseFloat(o.order_amount).toFixed(2)}</td>
                     <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span></td>
@@ -261,26 +255,6 @@ export default function ManagerView({ token }) {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* System Wipe Confirmation */}
-      {wipeConfirm && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h2 className="modal-title" style={{ color: 'var(--clr-danger)' }}>⚠️ System Clean Wipe</h2>
-            <p style={{ color: 'var(--clr-text-muted)', marginBottom: 20, lineHeight: 1.7 }}>
-              This will <strong style={{ color: 'var(--clr-danger)' }}>permanently delete</strong> all orders, expenses,
-              wallet transactions, and all user accounts except your own manager account.<br /><br />
-              This action <strong>cannot be undone</strong>. Are you absolutely sure?
-            </p>
-            <div className="modal-actions">
-              <button className="btn btn-ghost" onClick={() => setWipeConfirm(false)}>Cancel</button>
-              <button id="wipe-confirm-btn" className="btn btn-danger" onClick={handleWipe}>
-                🗑️ Wipe Everything
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

@@ -34,4 +34,22 @@ router.get('/all', authMiddleware, roleCheck(['supervisor', 'inventory', 'financ
 // Get Order Action Audit Log History
 router.get('/:id/audit-trail', authMiddleware, orderController.getOrderAuditTrail);
 
+// Record partial or full payment on order - Delivery Guy, Finance, Supervisor
+router.post('/:order_id/payments', authMiddleware, roleCheck(['delivery_guy', 'finance', 'supervisor']), orderController.recordPayment);
+
+const attachmentController = require('../controllers/attachment.controller');
+const feedbackController = require('../controllers/feedback.controller');
+
+// Upload photo attachment for order (Generic endpoint) - All authenticated roles
+router.post('/:id/attachments', authMiddleware, attachmentController.uploadAttachment);
+
+// Get list of attachments for order (Generic endpoint) - All authenticated roles
+router.get('/:id/attachments', authMiddleware, attachmentController.getOrderAttachments);
+
+// Submit customer voice feedback for order - Delivery Guy
+router.post('/:id/feedback', authMiddleware, roleCheck(['delivery_guy']), feedbackController.submitOrderFeedback);
+
+// Get customer voice feedback for order - All authenticated roles
+router.get('/:id/feedback', authMiddleware, feedbackController.getOrderFeedback);
+
 module.exports = router;

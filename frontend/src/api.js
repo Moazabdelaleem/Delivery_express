@@ -91,6 +91,89 @@ export const inventoryHandoff = (orderId, payload, token) =>
 export const getOrderAuditTrail = (orderId, token) =>
   fetch(`${BASE_URL}/orders/${orderId}/audit-trail`, { headers: headers(token) }).then(handle);
 
+// ---- Payments ----
+export const recordPayment = (orderId, payload, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/payments`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const getOrderPayments = (orderId, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/payments`, { headers: headers(token) }).then(handle);
+
+export const getPendingPayments = (token) =>
+  fetch(`${BASE_URL}/payments/pending`, { headers: headers(token) }).then(handle);
+
+export const confirmPayment = (paymentId, token) =>
+  fetch(`${BASE_URL}/payments/${paymentId}/confirm`, {
+    method: 'PUT', headers: headers(token)
+  }).then(handle);
+
+export const rejectPayment = (paymentId, token) =>
+  fetch(`${BASE_URL}/payments/${paymentId}/reject`, {
+    method: 'PUT', headers: headers(token)
+  }).then(handle);
+
+// ---- Returns ----
+export const createReturn = (payload, token) =>
+  fetch(`${BASE_URL}/returns`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const getReturnsQueue = (status, token) => {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return fetch(`${BASE_URL}/returns/queue${query}`, { headers: headers(token) }).then(handle);
+};
+
+export const getDriverReturnPickups = (token) =>
+  fetch(`${BASE_URL}/returns/my-pickups`, { headers: headers(token) }).then(handle);
+
+export const verifyReturn = (returnId, payload, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/verify`, {
+    method: 'PUT', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+// ---- Attachments ----
+export const uploadOrderAttachment = (orderId, payload, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/attachments`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const getOrderAttachments = (orderId, stage, token) => {
+  const query = stage ? `?stage=${encodeURIComponent(stage)}` : '';
+  return fetch(`${BASE_URL}/orders/${orderId}/attachments${query}`, { headers: headers(token) }).then(handle);
+};
+
+// ---- Shifts ----
+export const clockIn = (payload, token) =>
+  fetch(`${BASE_URL}/shifts/clock-in`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const clockOut = (token) =>
+  fetch(`${BASE_URL}/shifts/clock-out`, {
+    method: 'POST', headers: headers(token)
+  }).then(handle);
+
+export const getShiftSummary = (driverId, token) => {
+  const query = driverId ? `/${driverId}` : '';
+  return fetch(`${BASE_URL}/shifts/summary${query}`, { headers: headers(token) }).then(handle);
+};
+
+// ---- Feedback ----
+export const submitOrderFeedback = (orderId, payload, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/feedback`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const getOrderFeedback = (orderId, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/feedback`, { headers: headers(token) }).then(handle);
+
 // ---- Wallets ----
 export const getWalletSummary = (token) =>
   fetch(`${BASE_URL}/wallets/summary`, { headers: headers(token) }).then(handle);

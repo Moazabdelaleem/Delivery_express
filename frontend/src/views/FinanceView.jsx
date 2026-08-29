@@ -1,33 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit } from '../api.js';
+import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment } from '../api.js';
 import { toast } from '../App.jsx';
 
 export default function FinanceView({ token }) {
-  const [wallets, setWallets]       = useState([]);
-  const [expenses, setExpenses]     = useState(null);
-  const [globalAudit, setGlobalAudit] = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [pullModal, setPullModal]   = useState(null); // driver
-  const [topupModal, setTopup]      = useState(null); // driver
-  const [ledgerModal, setLedgerModal] = useState(null); // driver
-  const [ledgerData, setLedgerData] = useState(null);
+  const [wallets, setWallets]           = useState([]);
+  const [expenses, setExpenses]         = useState(null);
+  const [globalAudit, setGlobalAudit]   = useState([]);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [pullModal, setPullModal]       = useState(null); // driver
+  const [topupModal, setTopup]          = useState(null); // driver
+  const [ledgerModal, setLedgerModal]   = useState(null); // driver
+  const [confirmActionModal, setConfirmActionModal] = useState(null); // { payment, action: 'confirm' | 'reject' }
+  const [ledgerData, setLedgerData]     = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
-  const [pullAmt, setPullAmt]       = useState('');
-  const [topupAmt, setTopupAmt]     = useState('');
-  const [topupNote, setTopupNote]   = useState('');
-  const [submitting, setSub]        = useState(false);
-  const [activeTab, setActiveTab]   = useState('wallets');
+  const [pullAmt, setPullAmt]           = useState('');
+  const [topupAmt, setTopupAmt]         = useState('');
+  const [topupNote, setTopupNote]       = useState('');
+  const [submitting, setSub]            = useState(false);
+  const [activeTab, setActiveTab]       = useState('pending');
 
   const fetchData = useCallback(async () => {
     try {
-      const [wal, exp, aud] = await Promise.all([
+      const [wal, exp, aud, pend] = await Promise.all([
         getAllWallets(token),
         getExpenses(token),
-        getGlobalAudit(token).catch(() => [])
+        getGlobalAudit(token).catch(() => []),
+        getPendingPayments(token).catch(() => [])
       ]);
       setWallets(Array.isArray(wal) ? wal : []);
       setExpenses(exp);
       setGlobalAudit(Array.isArray(aud) ? aud : []);
+      setPendingPayments(Array.isArray(pend) ? pend : []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
     } finally {
@@ -40,6 +44,34 @@ export default function FinanceView({ token }) {
     const iv = setInterval(fetchData, 20000);
     return () => clearInterval(iv);
   }, [fetchData]);
+
+  const handleConfirmPayment = async (paymentId) => {
+    setSub(true);
+    try {
+      await confirmPayment(paymentId, token);
+      toast.success('Payment confirmed successfully!');
+      setConfirmActionModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(false);
+    }
+  };
+
+  const handleRejectPayment = async (paymentId) => {
+    setSub(true);
+    try {
+      await rejectPayment(paymentId, token);
+      toast.success('Payment rejected.');
+      setConfirmActionModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(false);
+    }
+  };
 
   const handleOpenLedger = async (driver) => {
     setLedgerModal(driver);
@@ -100,9 +132,11 @@ export default function FinanceView({ token }) {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1 className="section-title">Finance Dashboard</h1>
-        <p className="section-sub">Manage driver wallets, cash pullouts, and pocket allowances</p>
+      <div className="section-header">
+        <div>
+          <h1 className="section-title">Finance Dashboard</h1>
+          <p className="section-sub">Manage driver wallets, cash pullouts, and pocket allowances</p>
+        </div>
       </div>
 
       <div className="stat-grid">
@@ -129,6 +163,9 @@ export default function FinanceView({ token }) {
 
       {/* Tabs */}
       <div className="tab-row" style={{ marginBottom: 20 }}>
+        <button className={`tab-btn ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+          ⏳ Pending Payment Review {pendingPayments.length > 0 && <span className="badge badge-warning" style={{ marginLeft: 6 }}>{pendingPayments.length}</span>}
+        </button>
         <button className={`tab-btn ${activeTab === 'wallets' ? 'active' : ''}`} onClick={() => setActiveTab('wallets')}>
           💰 Wallets
         </button>
@@ -139,6 +176,79 @@ export default function FinanceView({ token }) {
           🧾 Cash Flow Audit
         </button>
       </div>
+
+      {activeTab === 'pending' && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">⏳ Order Payments Awaiting Finance Confirmation</span>
+            <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>
+              Confirming cash payments will deposit the amount to collection wallets. E-payments are recorded directly.
+            </span>
+          </div>
+          <div className="table-wrap">
+            {pendingPayments.length === 0 ? (
+              <div className="empty-state"><div className="empty-icon">✅</div><p>No payments currently awaiting finance review.</p></div>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tracking #</th>
+                    <th>Address</th>
+                    <th>Recorded By</th>
+                    <th>Driver</th>
+                    <th>Method</th>
+                    <th>Amount</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingPayments.map(p => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>#{p.tracking_number}</td>
+                      <td style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>{p.client_address}</td>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{p.recorded_by_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--clr-text-muted)', textTransform: 'capitalize' }}>{p.recorded_by_role}</div>
+                      </td>
+                      <td>{p.delivery_guy_name || '—'}</td>
+                      <td>
+                        <span className="badge badge-assigned" style={{ textTransform: 'uppercase', fontSize: 11 }}>
+                          {p.payment_method}
+                        </span>
+                      </td>
+                      <td className="amount amount-positive">
+                        EGP {parseFloat(p.amount).toFixed(2)}
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--clr-text-dim)' }}>
+                        {new Date(p.created_at || p.paid_at).toLocaleString()}
+                      </td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            className="btn btn-success btn-sm"
+                            disabled={submitting}
+                            onClick={() => setConfirmActionModal({ payment: p, action: 'confirm' })}
+                          >
+                            ✓ Confirm
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            disabled={submitting}
+                            onClick={() => setConfirmActionModal({ payment: p, action: 'reject' })}
+                          >
+                            ✕ Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {activeTab === 'wallets' && (
         <div className="card">
@@ -477,6 +587,34 @@ export default function FinanceView({ token }) {
 
             <div className="modal-actions" style={{ marginTop: 20 }}>
               <button className="btn btn-ghost" onClick={() => setLedgerModal(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Confirmation Modal */}
+      {confirmActionModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2 className="modal-title">
+              {confirmActionModal.action === 'confirm' ? 'Confirm Payment Verification' : 'Reject Payment Submission'}
+            </h2>
+            <p style={{ color: 'var(--clr-text-muted)', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+              Are you sure you want to {confirmActionModal.action === 'confirm' ? 'CONFIRM' : 'REJECT'} payment of{' '}
+              <strong style={{ color: 'var(--clr-accent)' }}>EGP {parseFloat(confirmActionModal.payment.amount).toFixed(2)}</strong> for order #{confirmActionModal.payment.tracking_number}?
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmActionModal(null)}>Cancel</button>
+              <button
+                className={`btn ${confirmActionModal.action === 'confirm' ? 'btn-success' : 'btn-danger'}`}
+                disabled={submitting}
+                onClick={() => confirmActionModal.action === 'confirm'
+                  ? handleConfirmPayment(confirmActionModal.payment.id)
+                  : handleRejectPayment(confirmActionModal.payment.id)
+                }
+              >
+                {confirmActionModal.action === 'confirm' ? 'Confirm Payment' : 'Reject Payment'}
+              </button>
             </div>
           </div>
         </div>

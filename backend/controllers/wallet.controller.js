@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendPushNotification } = require('../utils/pushNotifier');
 
 // Get Wallets Summary for a Delivery Guy or All Delivery Guys
 exports.getWalletsSummary = async (req, res) => {
@@ -20,9 +21,10 @@ exports.getWalletsSummary = async (req, res) => {
         [targetUserId]
       );
       const expenses = await db.query(
-        `SELECT e.*, u.name as delivery_guy_name
+        `SELECT e.*, u.name as delivery_guy_name, o.tracking_number as order_tracking_number, o.client_address
          FROM pocket_expenses e
          JOIN users u ON e.delivery_guy_id = u.id
+         LEFT JOIN orders o ON e.order_id = o.id
          WHERE e.delivery_guy_id = $1
          ORDER BY e.created_at DESC`,
         [targetUserId]
@@ -72,8 +74,19 @@ exports.financePullCashOut = async (req, res) => {
     client = await db.getClient();
     await client.query('BEGIN');
 
+    // 1. Ensure collection_wallets row exists and lock it FOR UPDATE
+    await client.query(
+      'INSERT INTO collection_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING',
+      [delivery_guy_id]
+    );
+    await client.query(
+      'SELECT * FROM collection_wallets WHERE delivery_guy_id = $1 FOR UPDATE',
+      [delivery_guy_id]
+    );
+
+    // 2. Lock target delivered orders rows FOR UPDATE
     const deliveredOrders = await client.query(
-      "SELECT id, order_amount FROM orders WHERE delivery_guy_id = $1 AND status = 'delivered'",
+      "SELECT id, order_amount FROM orders WHERE delivery_guy_id = $1 AND status = 'delivered' FOR UPDATE",
       [delivery_guy_id]
     );
 
@@ -101,10 +114,6 @@ exports.financePullCashOut = async (req, res) => {
       );
     }
 
-    await client.query(
-      'INSERT INTO collection_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING',
-      [delivery_guy_id]
-    );
     await client.query(
       'UPDATE collection_wallets SET current_balance = 0.00, updated_at = NOW() WHERE delivery_guy_id = $1',
       [delivery_guy_id]
@@ -146,7 +155,8 @@ exports.financeClearOrderCash = async (req, res) => {
     client = await db.getClient();
     await client.query('BEGIN');
 
-    const orderRes = await client.query('SELECT * FROM orders WHERE id = $1', [order_id]);
+    // Lock order row FOR UPDATE
+    const orderRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [order_id]);
     if (orderRes.rows.length === 0) {
       await client.query('ROLLBACK');
       client.release();
@@ -161,6 +171,16 @@ exports.financeClearOrderCash = async (req, res) => {
         error: `Order is not in 'delivered' state. Current status: ${order.status}`
       });
     }
+
+    // Lock collection wallet row FOR UPDATE
+    await client.query(
+      'INSERT INTO collection_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING',
+      [order.delivery_guy_id]
+    );
+    await client.query(
+      'SELECT * FROM collection_wallets WHERE delivery_guy_id = $1 FOR UPDATE',
+      [order.delivery_guy_id]
+    );
 
     const amount = parseFloat(order.order_amount || 0);
 
@@ -214,8 +234,13 @@ exports.financeTopUpPocketMoney = async (req, res) => {
     client = await db.getClient();
     await client.query('BEGIN');
 
+    // Ensure pocket wallet row exists & lock FOR UPDATE
     await client.query(
       'INSERT INTO pocket_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING',
+      [delivery_guy_id]
+    );
+    await client.query(
+      'SELECT * FROM pocket_wallets WHERE delivery_guy_id = $1 FOR UPDATE',
       [delivery_guy_id]
     );
 
@@ -243,10 +268,24 @@ exports.financeTopUpPocketMoney = async (req, res) => {
     client.release();
 
     const io = req.app.get('io');
+    const bufferEvent = req.app.get('bufferEvent');
     if (io) {
-      io.emit('wallet_updated', { delivery_guy_id, type: 'topup', amount: topUpAmount });
-      io.emit('pocket_topup', { delivery_guy_id, amount: topUpAmount });
+      const payloadUpdated = { delivery_guy_id, type: 'topup', amount: topUpAmount };
+      const payloadTopup = { delivery_guy_id, amount: topUpAmount };
+      io.emit('wallet_updated', payloadUpdated);
+      io.emit('pocket_topup', payloadTopup);
+      if (bufferEvent) {
+        bufferEvent(delivery_guy_id, 'wallet_updated', payloadUpdated);
+        bufferEvent(delivery_guy_id, 'pocket_topup', payloadTopup);
+      }
     }
+
+    sendPushNotification(
+      delivery_guy_id,
+      'Pocket Money Top-Up',
+      `Finance topped up your pocket allowance wallet with $${topUpAmount.toFixed(2)}.`,
+      { type: 'topup', amount: topUpAmount }
+    );
 
     res.json({
       message:       `Successfully topped up ${topUpAmount} to pocket wallet.`,
@@ -266,7 +305,7 @@ exports.financeTopUpPocketMoney = async (req, res) => {
 exports.recordPocketExpense = async (req, res) => {
   let client;
   try {
-    const { amount, reason } = req.body;
+    const { amount, reason, order_id } = req.body;
     const expenseAmount = parseFloat(amount);
 
     if (!expenseAmount || expenseAmount <= 0) {
@@ -276,6 +315,8 @@ exports.recordPocketExpense = async (req, res) => {
       return res.status(400).json({ error: 'A mandatory reason is required for spending pocket money.' });
     }
 
+    const targetOrderId = (order_id && String(order_id).trim() !== '') ? order_id : null;
+
     client = await db.getClient();
     await client.query('BEGIN');
 
@@ -284,8 +325,9 @@ exports.recordPocketExpense = async (req, res) => {
       [req.user.id]
     );
 
+    // Lock pocket wallet row FOR UPDATE to prevent race conditions during expense calculation
     const walletRes = await client.query(
-      'SELECT * FROM pocket_wallets WHERE delivery_guy_id = $1',
+      'SELECT * FROM pocket_wallets WHERE delivery_guy_id = $1 FOR UPDATE',
       [req.user.id]
     );
 
@@ -307,25 +349,32 @@ exports.recordPocketExpense = async (req, res) => {
     );
 
     const expenseRes = await client.query(
-      `INSERT INTO pocket_expenses (pocket_wallet_id, delivery_guy_id, amount, reason)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [wallet.id, req.user.id, expenseAmount, reason.trim()]
+      `INSERT INTO pocket_expenses (pocket_wallet_id, delivery_guy_id, amount, reason, order_id)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [wallet.id, req.user.id, expenseAmount, reason.trim(), targetOrderId]
     );
 
     await client.query(
       `INSERT INTO wallet_transactions
-         (wallet_type, delivery_guy_id, transaction_type, amount, balance_after, performed_by, notes_or_reason)
-       VALUES ('pocket', $1, 'pocket_expense', $2, $3, $4, $5)`,
-      [req.user.id, expenseAmount, newBalance, req.user.id, reason.trim()]
+         (wallet_type, delivery_guy_id, transaction_type, amount, balance_after, performed_by, notes_or_reason, related_order_id)
+       VALUES ('pocket', $1, 'pocket_expense', $2, $3, $4, $5, $6)`,
+      [req.user.id, expenseAmount, newBalance, req.user.id, reason.trim(), targetOrderId]
     );
 
     await client.query('COMMIT');
     client.release();
 
     const io = req.app.get('io');
+    const bufferEvent = req.app.get('bufferEvent');
     if (io) {
-      io.emit('wallet_updated', { delivery_guy_id: req.user.id, type: 'expense', amount: expenseAmount });
-      io.emit('pocket_expense_logged', { delivery_guy_id: req.user.id, amount: expenseAmount });
+      const payloadUpdated = { delivery_guy_id: req.user.id, type: 'expense', amount: expenseAmount };
+      const payloadExpense = { delivery_guy_id: req.user.id, amount: expenseAmount };
+      io.emit('wallet_updated', payloadUpdated);
+      io.emit('pocket_expense_logged', payloadExpense);
+      if (bufferEvent) {
+        bufferEvent(req.user.id, 'wallet_updated', payloadUpdated);
+        bufferEvent(req.user.id, 'pocket_expense_logged', payloadExpense);
+      }
     }
 
     res.status(201).json({
@@ -347,9 +396,10 @@ exports.recordPocketExpense = async (req, res) => {
 exports.getExpensesBreakdown = async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT e.*, u.name as delivery_guy_name, u.email as delivery_guy_email
+      `SELECT e.*, u.name as delivery_guy_name, u.email as delivery_guy_email, o.tracking_number as order_tracking_number, o.client_address
        FROM pocket_expenses e
        JOIN users u ON e.delivery_guy_id = u.id
+       LEFT JOIN orders o ON e.order_id = o.id
        ORDER BY e.created_at DESC`
     );
 
@@ -392,9 +442,10 @@ exports.getDriverWalletLedger = async (req, res) => {
     const pocket = pocketRes.rows[0] || { current_balance: 0.00, total_topped_up: 0.00, total_spent: 0.00 };
 
     const expensesRes = await db.query(
-      `SELECT e.*, u.name as delivery_guy_name
+      `SELECT e.*, u.name as delivery_guy_name, o.tracking_number as order_tracking_number, o.client_address
        FROM pocket_expenses e
        JOIN users u ON e.delivery_guy_id = u.id
+       LEFT JOIN orders o ON e.order_id = o.id
        WHERE e.delivery_guy_id = $1
        ORDER BY e.created_at DESC`,
       [delivery_guy_id]

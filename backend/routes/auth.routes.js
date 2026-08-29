@@ -19,9 +19,14 @@ const authLimiter = rateLimit({
 router.get('/check-username/:username', authController.checkUsernameAvailability);
 router.post('/register', authLimiter, authController.register);
 router.post('/login', authLimiter, authController.login);
+router.post('/seed', authController.seedDemoAccounts);
 
 // Online Status Toggle (Authenticated)
-router.put('/status', auth, authController.updateOnlineStatus);
+router.put('/status', auth, roleCheck(['delivery_guy', 'supervisor', 'inventory', 'finance']), authController.updateOnlineStatus);
+
+// Push Token Storage (Authenticated)
+router.post('/push-token', auth, authController.savePushToken);
+
 
 // Role-based User Lookups
 router.get('/role/:role', auth, authController.getUsersByRole);

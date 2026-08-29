@@ -1,37 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, createOrder, getUsersByRole } from '../api.js';
+import { getAllOrders, createOrder, getUsersByRole, createReturn, getShiftSummary } from '../api.js';
+import PhotoCapture from '../components/PhotoCapture.jsx';
 import { toast } from '../App.jsx';
-
-const STATUS_LABEL = {
-  created: 'Created', assigned: 'Assigned', notified_inventory: 'Notified Inv.',
-  handed_to_delivery: 'Handed Over', pickup_failed: 'Pickup Failed',
-  in_transit: 'In Transit', delivered: 'Delivered', delivery_failed: 'Failed',
-  returned_to_company: 'Returned', cash_cleared: 'Cash Cleared',
-};
+import { STATUS_LABEL } from '../constants/statusLabels.js';
 
 export default function SupervisorView({ token, user }) {
-  const [orders, setOrders]       = useState([]);
-  const [drivers, setDrivers]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [submitting, setSub]      = useState(false);
-  const [filter, setFilter]       = useState('all');
-  const [detailsModal, setDetailsModal] = useState(false);
-  const [detailsType, setDetailsType] = useState('');
+  const [orders, setOrders]                 = useState([]);
+  const [drivers, setDrivers]               = useState([]);
+  const [shiftSummaries, setShiftSummaries] = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [showModal, setShowModal]           = useState(false);
+  const [submitting, setSub]                = useState(false);
+  const [filter, setFilter]                 = useState('all');
+  const [detailsModal, setDetailsModal]     = useState(false);
+  const [detailsType, setDetailsType]       = useState('');
+
+  const [returnModal, setReturnModal]   = useState(null); // order object
+  const [retType, setRetType]           = useState('full');
+  const [retReason, setRetReason]       = useState('');
+  const [retAmount, setRetAmount]       = useState('');
+
+  const [isThirdParty, setIsThirdParty]   = useState(false);
+  const [thirdPartyAtt, setThirdPartyAtt] = useState(null);
 
   const [form, setForm] = useState({
-    client_name: '', client_phone: '', client_address: '',
-    order_details: '', order_amount: '', delivery_guy_id: ''
+    client_address: '',
+    order_details: '', order_amount: '', delivery_guy_id: '', payment_type: 'pay_after_delivery'
   });
 
   const fetchData = useCallback(async () => {
     try {
-      const [ord, drv] = await Promise.all([
+      const [ord, drv, shSummary] = await Promise.all([
         getAllOrders(token),
         getUsersByRole('delivery_guy', token),
+        getShiftSummary(null, token).catch(() => ({ summaries: [] }))
       ]);
       setOrders(ord);
       setDrivers(drv);
+      setShiftSummaries(shSummary.summaries || []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
     } finally {
@@ -50,23 +56,48 @@ export default function SupervisorView({ token, user }) {
     setDetailsModal(true);
   };
 
-  const handleCreate = async (e) => {
+  const handleCreateOrder = async (e) => {
     e.preventDefault();
     setSub(true);
     try {
-      await createOrder({
-        ...form,
-        order_amount: parseFloat(form.order_amount) || 0,
-        delivery_guy_id: form.delivery_guy_id || undefined,
-      }, token);
-      toast.success('Order created successfully!');
+      const payload = { ...form };
+      if (!payload.delivery_guy_id) delete payload.delivery_guy_id;
+      if (isThirdParty) {
+        payload.is_third_party = true;
+        if (thirdPartyAtt) {
+          payload.third_party_receipt_attachment_id = thirdPartyAtt.id;
+        }
+      }
+      await createOrder(payload, token);
+      toast.success('Order created and dispatched successfully!');
       setShowModal(false);
-      setForm({ client_name: '', client_phone: '', client_address: '', order_details: '', order_amount: '', delivery_guy_id: '' });
+      setIsThirdParty(false);
+      setThirdPartyAtt(null);
+      setForm({ client_address: '', order_details: '', order_amount: '', delivery_guy_id: '', payment_type: 'pay_after_delivery' });
       fetchData();
     } catch (err) {
       toast.error(err.message);
     } finally {
       setSub(false);
+    }
+  };
+
+  const handleInitiateReturn = async (e) => {
+    e.preventDefault();
+    try {
+      await createReturn({
+        order_id: returnModal.id,
+        return_type: retType,
+        returned_items_amount: retAmount ? parseFloat(retAmount) : undefined,
+        reason: retReason.trim()
+      }, token);
+      toast.success(`Return initiated for order #${returnModal.tracking_number}`);
+      setReturnModal(null);
+      setRetAmount('');
+      setRetReason('');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -81,7 +112,7 @@ export default function SupervisorView({ token, user }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+      <div className="section-header">
         <div>
           <h1 className="section-title">Supervisor Dashboard</h1>
           <p className="section-sub">Create and monitor all delivery orders</p>
@@ -146,20 +177,21 @@ export default function SupervisorView({ token, user }) {
             <table>
               <thead>
                 <tr>
-                  <th>Tracking</th><th>Client</th><th>Address</th>
-                  <th>Amount</th><th>Driver</th><th>Status</th><th>Created</th>
+                  <th>Tracking</th><th>Address</th>
+                  <th>Amount</th><th>Type</th><th>Driver</th><th>Status</th><th>Created</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(o => (
                   <tr key={o.id}>
                     <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>{o.tracking_number}</td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{o.client_name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--clr-text-muted)' }}>{o.client_phone}</div>
-                    </td>
                     <td style={{ fontSize: 12, color: 'var(--clr-text-muted)', maxWidth: 180 }}>{o.client_address}</td>
                     <td className="amount">EGP {parseFloat(o.order_amount).toFixed(2)}</td>
+                    <td>
+                      <span className="badge badge-ghost" style={{ textTransform: 'capitalize' }}>
+                        {(o.payment_type || 'pay_after_delivery').replace(/_/g, ' ')}
+                      </span>
+                    </td>
                     <td>
                       {o.delivery_guy_name
                         ? <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -185,16 +217,6 @@ export default function SupervisorView({ token, user }) {
           <div className="modal" style={{ maxWidth: 520 }}>
             <h2 className="modal-title">📦 New Delivery Order</h2>
             <form id="create-order-form" onSubmit={handleCreate}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Client Name</label>
-                  <input id="order-client-name" className="form-input" placeholder="Ahmed Hassan" value={form.client_name} onChange={e => setForm(f => ({ ...f, client_name: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Client Phone</label>
-                  <input id="order-client-phone" className="form-input" placeholder="01xxxxxxxxx" value={form.client_phone} onChange={e => setForm(f => ({ ...f, client_phone: e.target.value }))} />
-                </div>
-              </div>
               <div className="form-group">
                 <label className="form-label">Delivery Address <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
                 <input id="order-address" className="form-input" placeholder="Building, Street, Area" value={form.client_address} onChange={e => setForm(f => ({ ...f, client_address: e.target.value }))} required />
@@ -203,22 +225,30 @@ export default function SupervisorView({ token, user }) {
                 <label className="form-label">Order Details</label>
                 <input id="order-details" className="form-input" placeholder="e.g. 1x Laptop, 2x Headphones" value={form.order_details} onChange={e => setForm(f => ({ ...f, order_details: e.target.value }))} />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 14px' }}>
-                <div className="form-group">
-                  <label className="form-label">Amount (EGP)</label>
-                  <input id="order-amount" className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={form.order_amount} onChange={e => setForm(f => ({ ...f, order_amount: e.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Assign Driver</label>
-                  <select id="order-driver" className="form-select" value={form.delivery_guy_id} onChange={e => setForm(f => ({ ...f, delivery_guy_id: e.target.value }))}>
-                    <option value="">— Select driver —</option>
-                    {drivers.map(d => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} {d.online_status === 'online' ? '🟢' : '⚫'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group">
+                <label className="form-label">Amount (EGP)</label>
+                <input id="order-amount" className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={form.order_amount} onChange={e => setForm(f => ({ ...f, order_amount: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 'bold', color: 'var(--clr-primary)' }}>💳 Payment Type *</label>
+                <select id="order-payment-type" className="form-select" style={{ fontWeight: 'bold' }} value={form.payment_type} onChange={e => setForm(f => ({ ...f, payment_type: e.target.value }))}>
+                  <option value="pay_after_delivery">Pay After Delivery (كاش بعد التسليم)</option>
+                  <option value="full_upfront">Full Upfront (دفع مقدم كامل)</option>
+                  <option value="accounts_payable">Accounts Payable (آجل / حسابات)</option>
+                  <option value="installments">Installments (تقسيط / أقساط)</option>
+                  <option value="other">Other / Transfer (آخر / تحويل)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Assign Driver <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
+                <select id="order-driver" className="form-select" value={form.delivery_guy_id} onChange={e => setForm(f => ({ ...f, delivery_guy_id: e.target.value }))}>
+                  <option value="">— Select driver —</option>
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.online_status === 'online' ? '🟢' : '⚫'}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
@@ -295,10 +325,7 @@ export default function SupervisorView({ token, user }) {
                       .map(o => (
                         <tr key={o.id}>
                           <td style={{ fontWeight: 600, color: 'var(--clr-accent)' }}>#{o.tracking_number}</td>
-                          <td>
-                            <div>{o.client_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--clr-text-muted)' }}>{o.client_address}</div>
-                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--clr-text-muted)' }}>{o.client_address}</td>
                           <td>EGP {parseFloat(o.order_amount || 0).toFixed(2)}</td>
                           <td>{o.delivery_guy_name || <span style={{ color: 'var(--clr-warning)' }}>Unassigned</span>}</td>
                           <td>

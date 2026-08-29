@@ -150,6 +150,27 @@ body {
   width: 100%;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tracking-number {
+  font-weight: 700;
+  color: var(--clr-accent);
+  font-size: 13px;
+}
+
+.text-muted-sm {
+  font-size: 12px;
+  color: var(--clr-text-muted);
+  margin-bottom: 4px;
+}
+
 /* =================== CARDS =================== */
 .card {
   background: var(--clr-surface);
@@ -158,6 +179,14 @@ body {
   padding: 20px;
   box-shadow: var(--shadow-card);
   transition: border-color var(--t-fast);
+}
+
+.card-accent-warning {
+  border-left: 3px solid var(--clr-warning) !important;
+}
+
+.card-accent-primary {
+  border-left: 3px solid var(--clr-accent) !important;
 }
 
 .card:hover {

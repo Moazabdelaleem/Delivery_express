@@ -39,8 +39,7 @@ async function runE2ETests() {
         Authorization: `Bearer ${supervisorToken}` 
       },
       body: JSON.stringify({
-        client_name: 'Test Client John',
-        client_phone: '0123456789',
+        tracking_number: `E2E-${Date.now()}`,
         client_address: 'Building 12, GIU Campus',
         order_details: '1x Laptop, 2x Monitors',
         order_amount: 150.00,
@@ -195,7 +194,7 @@ async function runE2ETests() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${managerToken}` 
       },
-      body: JSON.stringify({ client_name: 'Hack Attempt' })
+      body: JSON.stringify({ tracking_number: 'MGR-DENIED-101', client_address: 'Hack Attempt' })
     });
 
     if (managerPostRes.status === 403) {

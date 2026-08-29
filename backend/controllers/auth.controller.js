@@ -84,8 +84,9 @@ exports.register = async (req, res) => {
     return res.status(201).json({
       message: 'Account registration submitted! Pending approval from an Executive Manager.',
       requiresApproval: true,
-      user: { username: newUser.username, name: newUser.name, role: newUser.role }
+      user: { id: newUser.id, username: newUser.username, name: newUser.name, role: newUser.role }
     });
+
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Server error during registration.' });
@@ -123,11 +124,13 @@ exports.login = async (req, res) => {
     }
 
     const secret = process.env.JWT_SECRET;
+    const tokenExpiry = user.role === 'delivery_guy' ? '7d' : '12h';
     const token = jwt.sign(
       { id: user.id, username: user.username, name: user.name, role: user.role },
       secret,
-      { expiresIn: '7d' }
+      { expiresIn: tokenExpiry }
     );
+
 
     res.json({
       message: 'Login successful.',
@@ -239,3 +242,91 @@ exports.getUsersByRole = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch users.' });
   }
 };
+
+// Seed Default Demo Accounts (Disabled in Production)
+exports.seedDemoAccounts = async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    if (res) {
+      return res.status(403).json({ error: 'Access Forbidden: Seeding demo accounts is disabled in production.' });
+    }
+    console.warn('⚠️ Seeding demo accounts skipped in production mode.');
+    return;
+  }
+
+  try {
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash('Admin123!', salt);
+
+    const demoUsers = [
+      { username: 'sami_delivery', name: 'Sami Delivery', role: 'delivery_guy', email: 'sami@delivery.com', phone: '01012345678' },
+      { username: 'kareem_supervisor', name: 'Kareem Supervisor', role: 'supervisor', email: 'kareem@delivery.com', phone: '01023456789' },
+      { username: 'hassan_inventory', name: 'Hassan Inventory', role: 'inventory', email: 'hassan@delivery.com', phone: '01034567890' },
+      { username: 'mona_finance', name: 'Mona Finance', role: 'finance', email: 'mona@delivery.com', phone: '01045678901' },
+      { username: 'tarek_manager', name: 'Tarek Manager', role: 'manager', email: 'tarek@delivery.com', phone: '01056789012' },
+      { username: 'omar_executive', name: 'Omar Executive', role: 'manager', email: 'omar@delivery.com', phone: '01067890123' },
+    ];
+
+    const seededUsers = [];
+
+    for (const u of demoUsers) {
+      const existing = await db.query('SELECT id FROM users WHERE LOWER(username) = $1', [u.username]);
+      let userId;
+      if (existing.rows.length > 0) {
+        userId = existing.rows[0].id;
+        await db.query(
+          `UPDATE users SET name = $1, password_hash = $2, role = $3, is_approved = true, phone = $5, email = $6 WHERE id = $4`,
+          [u.name, passwordHash, u.role, userId, u.phone, u.email]
+        );
+      } else {
+        const ins = await db.query(
+          `INSERT INTO users (username, name, email, password_hash, role, phone, is_approved)
+           VALUES ($1, $2, $3, $4, $5, $6, true)
+           RETURNING id`,
+          [u.username, u.name, u.email, passwordHash, u.role, u.phone]
+        );
+        userId = ins.rows[0].id;
+      }
+
+
+      if (u.role === 'delivery_guy') {
+        await db.query(`INSERT INTO collection_wallets (delivery_guy_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
+        await db.query(`INSERT INTO pocket_wallets (delivery_guy_id, current_balance, total_topped_up, total_spent) VALUES ($1, 50.00, 50.00, 0.00) ON CONFLICT DO NOTHING`, [userId]);
+      }
+
+      seededUsers.push(u.username);
+    }
+
+    const message = `Demo accounts seeded & approved successfully: ${seededUsers.join(', ')}`;
+    if (res) {
+      return res.status(200).json({ message, seededUsers });
+    }
+    console.log(`✅ ${message}`);
+  } catch (err) {
+    console.error('Seed demo accounts error:', err);
+    if (res) {
+      return res.status(500).json({ error: 'Failed to seed demo accounts.' });
+    }
+  }
+};
+
+// Register or Update User Expo Push Token (POST /api/users/push-token)
+exports.savePushToken = async (req, res) => {
+  try {
+    const { push_token } = req.body;
+    if (!push_token || typeof push_token !== 'string') {
+      return res.status(400).json({ error: 'Valid push_token string is required.' });
+    }
+
+    await db.query(
+      'UPDATE users SET push_token = $1, updated_at = NOW() WHERE id = $2',
+      [push_token.trim(), req.user.id]
+    );
+
+    res.json({ message: 'Push token saved successfully.', push_token: push_token.trim() });
+  } catch (err) {
+    console.error('Error saving push token:', err);
+    res.status(500).json({ error: err.message || 'Server error saving push token.' });
+  }
+};
+

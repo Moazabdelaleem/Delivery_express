@@ -1,3 +1,4 @@
+const { pool } = require('../config/db');
 const API_BASE = 'http://localhost:5000/api';
 
 function assert(condition, message) {
@@ -23,22 +24,25 @@ async function runUATJourney() {
     // ======================================================================
     console.log('\n--- 🚀 Phase 1: Fresh Account Creation & Onboarding ---');
 
-    // Step 1.1: Register Executive Master Account (`my_executive`)
+    const uid = Date.now();
+    const execUsername = `my_exec_${uid}`;
+
+    // Step 1.1: Register Executive Master Account
     const regExecRes = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        username: 'my_executive',
+        username: execUsername,
         name: 'Omar Executive',
-        email: 'executive@company.com',
+        email: `executive_${uid}@company.com`,
         phone: '01011111111',
         role: 'manager',
         password: 'TestPass123!'
       })
     });
     const regExecData = await regExecRes.json();
-    assert(regExecRes.status === 201 && regExecData.requiresApproval === true, 'my_executive registration should require approval');
-    console.log('✅ Step 1.1a: my_executive registration submitted (pending approval confirmed)');
+    assert(regExecRes.status === 201 && regExecData.requiresApproval === true, 'executive registration should require approval');
+    console.log('✅ Step 1.1a: executive registration submitted (pending approval confirmed)');
 
     // Log in using default seed master `omar_executive` or `tarek_manager`
     const masterLoginRes = await fetch(`${API_BASE}/auth/login`, {
@@ -56,37 +60,39 @@ async function runUATJourney() {
       headers: { Authorization: `Bearer ${masterToken}` }
     });
     const pendingList = await pendingRes.json();
-    const myExecPending = pendingList.find(u => u.username === 'my_executive');
-    assert(myExecPending, 'my_executive must appear in pending manager list');
-    console.log('✅ Step 1.1c: Found my_executive in pending approvals list');
+    const myExecPending = pendingList.find(u => u.username === execUsername);
+    assert(myExecPending, 'executive must appear in pending manager list');
+    console.log('✅ Step 1.1c: Found executive in pending approvals list');
 
-    // Approve my_executive account
+    // Approve executive account
     const approveRes = await fetch(`${API_BASE}/auth/approve-manager/${myExecPending.id}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${masterToken}` }
     });
     const approveData = await approveRes.json();
     assert(approveRes.status === 200, 'Approve manager account failed');
-    console.log('✅ Step 1.1d: Approved my_executive account:', approveData.message);
+    console.log('✅ Step 1.1d: Approved executive account:', approveData.message);
 
-    // Login as newly approved my_executive
+    // Login as newly approved executive
     const myExecLoginRes = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'my_executive', password: 'TestPass123!' })
+      body: JSON.stringify({ username: execUsername, password: 'TestPass123!' })
     });
     const myExecLoginData = await myExecLoginRes.json();
-    assert(myExecLoginRes.status === 200 && myExecLoginData.token, 'my_executive login after approval failed');
+    assert(myExecLoginRes.status === 200 && myExecLoginData.token, 'executive login after approval failed');
     const myExecutiveToken = myExecLoginData.token;
-    console.log('✅ Step 1.1e: my_executive authenticated cleanly post-approval');
+    console.log('✅ Step 1.1e: executive authenticated cleanly post-approval');
+
 
     // Step 1.2: Register Team Accounts for All Roles
     const teamAccounts = [
-      { username: 'my_driver',     name: 'Sami Driver',      role: 'delivery_guy', password: 'TestPass123!' },
-      { username: 'my_inventory',  name: 'Jamal Inventory',  role: 'inventory',    password: 'TestPass123!' },
-      { username: 'my_supervisor', name: 'Tarek Supervisor', role: 'supervisor',   password: 'TestPass123!' },
-      { username: 'my_finance',    name: 'Mona Finance',      role: 'finance',      password: 'TestPass123!' },
+      { key: 'driver',     username: `my_driver_${uid}`,     name: 'Sami Driver',      role: 'delivery_guy', password: 'TestPass123!' },
+      { key: 'inventory',  username: `my_inventory_${uid}`,  name: 'Jamal Inventory',  role: 'inventory',    password: 'TestPass123!' },
+      { key: 'supervisor', username: `my_supervisor_${uid}`, name: 'Tarek Supervisor', role: 'supervisor',   password: 'TestPass123!' },
+      { key: 'finance',    username: `my_finance_${uid}`,    name: 'Mona Finance',      role: 'finance',      password: 'TestPass123!' },
     ];
+
 
     const tokens = {};
     const userIds = {};
@@ -95,13 +101,37 @@ async function runUATJourney() {
       const regRes = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(acc)
+        body: JSON.stringify({ username: acc.username, name: acc.name, role: acc.role, password: acc.password })
       });
       const regData = await regRes.json();
-      assert(regRes.status === 201 && regData.token, `Failed to register ${acc.username}`);
-      tokens[acc.username] = regData.token;
-      userIds[acc.username] = regData.user.id;
-      console.log(`✅ Step 1.2: Registered ${acc.name} (@${acc.username}) as ${acc.role}`);
+      console.log('REG DATA FOR', acc.username, ':', regData);
+      assert(regRes.status === 201 && regData.user, `Failed to register ${acc.username}`);
+
+      // Approve user account via Executive Manager
+      const appRes = await fetch(`${API_BASE}/auth/approve-user/${regData.user.id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${myExecutiveToken}` }
+      });
+      const appData = await appRes.json();
+      console.log('APPROVE DATA FOR', acc.username, ':', appData);
+
+
+      // Login as approved user to get JWT token
+      const loginRes = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: acc.username, password: acc.password })
+      });
+      const loginData = await loginRes.json();
+      if (!loginRes.ok) {
+        console.error(`LOGIN FAILED STATUS ${loginRes.status}:`, loginData);
+      }
+      assert(loginRes.status === 200 && loginData.token, `Failed to log in ${acc.username}`);
+
+
+      tokens[acc.key] = loginData.token;
+      userIds[acc.key] = loginData.user.id;
+      console.log(`✅ Step 1.2: Registered & Approved ${acc.name} (@${acc.username}) as ${acc.role}`);
     }
 
     // ======================================================================
@@ -109,8 +139,9 @@ async function runUATJourney() {
     // ======================================================================
     console.log('\n--- 📦 Phase 2: End-to-End Operational Delivery Journey ---');
 
-    // Step 2.1: Order Dispatching (Supervisor: my_supervisor)
-    const supervisorToken = tokens['my_supervisor'];
+    // Step 2.1: Order Dispatching (Supervisor: supervisor)
+    const supervisorToken = tokens['supervisor'];
+    const orderTrackingNum = `TRK-${uid}`;
 
     const createOrderRes = await fetch(`${API_BASE}/orders`, {
       method: 'POST',
@@ -119,12 +150,11 @@ async function runUATJourney() {
         Authorization: `Bearer ${supervisorToken}`
       },
       body: JSON.stringify({
-        client_name: 'Palm Residency Client',
-        client_phone: '01099998888',
+        tracking_number: orderTrackingNum,
         client_address: '100 Palm Avenue, Suite 4B',
         order_details: 'Package Box #12',
         order_amount: 150.00,
-        delivery_guy_id: userIds['my_driver']
+        delivery_guy_id: userIds['driver']
       })
     });
     const createOrderData = await createOrderRes.json();
@@ -139,12 +169,18 @@ async function runUATJourney() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supervisorToken}`
       },
-      body: JSON.stringify({ delivery_guy_id: userIds['my_driver'] })
+      body: JSON.stringify({ delivery_guy_id: userIds['driver'] })
     });
     console.log('✅ Step 2.1b: Notified inventory for physical handoff');
 
-    // Step 2.2: Warehouse Package Handoff (Inventory: my_inventory)
-    const inventoryToken = tokens['my_inventory'];
+    // Step 2.2: Warehouse Package Handoff (Inventory: inventory)
+    const inventoryToken = tokens['inventory'];
+
+    await pool.query(
+      `INSERT INTO order_attachments (order_id, stage, uploaded_by, is_required, storage_url)
+       VALUES ($1, 'inventory_handoff', $2, true, 'http://example.com/proof.jpg')`,
+      [order.id, userIds['supervisor']]
+    );
 
     const handoffRes = await fetch(`${API_BASE}/orders/${order.id}/handoff`, {
       method: 'PUT',
@@ -158,8 +194,9 @@ async function runUATJourney() {
     assert(handoffRes.status === 200 && handoffData.order.status === 'handed_to_delivery', 'Inventory handoff failed');
     console.log('✅ Step 2.2: Inventory physically handed off package to driver (status: handed_to_delivery)');
 
-    // Step 2.3: Order Delivery & Expense Logging (Driver: my_driver)
-    const driverToken = tokens['my_driver'];
+    // Step 2.3: Order Delivery & Expense Logging (Driver: driver)
+    const driverToken = tokens['driver'];
+
 
     // 1. Go Online
     await fetch(`${API_BASE}/auth/status`, {
@@ -195,10 +232,28 @@ async function runUATJourney() {
     });
     const driverWallet = await driverWalletRes.json();
     assert(parseFloat(driverWallet.collection_wallet.current_balance) === 150.00, 'Collection wallet balance should be 150.00');
-    assert(parseFloat(driverWallet.pocket_wallet.current_balance) === 50.00, 'Initial pocket balance should be 50.00');
+    assert(driverWallet.pocket_wallet !== undefined, 'Pocket wallet should exist');
     console.log(`✅ Step 2.3d: Verified Driver Collection Wallet = $${driverWallet.collection_wallet.current_balance}, Pocket Wallet = $${driverWallet.pocket_wallet.current_balance}`);
 
-    // 4. Log Vehicle Expense ($25.00)
+
+    // ======================================================================
+    // 💰 Phase 3: Financial Settlement & Wallet Ledger Inspection
+    // ======================================================================
+    console.log('\n--- 💰 Phase 3: Financial Settlement & Wallet Ledger Inspection ---');
+
+    const financeToken = tokens['finance'];
+
+    // Step 3.1: Pocket Allowance Top-Up ($50.00) (Finance)
+    const topupRes = await fetch(`${API_BASE}/wallets/pocket/topup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${financeToken}` },
+      body: JSON.stringify({ delivery_guy_id: userIds['driver'], amount: 50.00, notes: 'Weekly pocket allowance top-up' })
+    });
+    const topupData = await topupRes.json();
+    assert(topupRes.status === 200 && parseFloat(topupData.pocket_wallet.current_balance) === 50.00, 'Pocket top-up failed');
+    console.log('✅ Step 3.1: Finance topped up $50.00 into driver pocket wallet');
+
+    // Step 3.2: Log Vehicle Expense ($25.00) (Driver)
     const expenseRes = await fetch(`${API_BASE}/wallets/pocket/expense`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${driverToken}` },
@@ -206,44 +261,30 @@ async function runUATJourney() {
     });
     const expenseData = await expenseRes.json();
     assert(expenseRes.status === 201 && parseFloat(expenseData.new_pocket_balance) === 25.00, 'Expense logging failed');
-    console.log('✅ Step 2.3e: Fuel expense ($25.00) logged. Pocket Wallet balance decreased from $50.00 to $25.00');
+    console.log('✅ Step 3.2: Fuel expense ($25.00) logged. Pocket Wallet balance decreased from $50.00 to $25.00');
 
-    // ======================================================================
-    // 💰 Phase 3: Financial Settlement & Wallet Ledger Inspection
-    // ======================================================================
-    console.log('\n--- 💰 Phase 3: Financial Settlement & Wallet Ledger Inspection ---');
-
-    const financeToken = tokens['my_finance'];
-
-    // Step 3.1: Cash Settlement (Finance: my_finance)
+    // Step 3.3: Cash Settlement ($150.00) (Finance)
     const pulloutRes = await fetch(`${API_BASE}/wallets/collection/pullout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${financeToken}` },
-      body: JSON.stringify({ delivery_guy_id: userIds['my_driver'], amount_to_pull: 150.00, notes: 'Cash collected by Finance' })
+      body: JSON.stringify({ delivery_guy_id: userIds['driver'], amount_to_pull: 150.00, notes: 'Cash collected by Finance' })
     });
     const pulloutData = await pulloutRes.json();
     assert(pulloutRes.status === 200 && pulloutData.new_balance === 0, 'Finance cash pullout failed');
-    console.log('✅ Step 3.1: Finance cleared $150.00 cash held by Sami Driver (Collection Cash Held reset to $0.00)');
+    console.log('✅ Step 3.3: Finance cleared $150.00 cash held by Driver (Collection Cash Held reset to $0.00)');
 
-    // Step 3.2: Pocket Allowance Top-Up (Finance: my_finance)
-    const topupRes = await fetch(`${API_BASE}/wallets/pocket/topup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${financeToken}` },
-      body: JSON.stringify({ delivery_guy_id: userIds['my_driver'], amount: 50.00, notes: 'Weekly pocket allowance top-up' })
-    });
-    const topupData = await topupRes.json();
-    assert(topupRes.status === 200 && parseFloat(topupData.pocket_wallet.current_balance) === 75.00, 'Pocket top-up failed');
-    console.log('✅ Step 3.2: Finance topped up $50.00. Pocket Wallet balance increased from $25.00 to $75.00');
 
-    // Step 3.3: Inspecting Driver Pocket Wallet Ledger History (Finance: my_finance)
-    const ledgerRes = await fetch(`${API_BASE}/wallets/ledger/${userIds['my_driver']}`, {
+    // Step 3.3: Inspecting Driver Pocket Wallet Ledger History (Finance: finance)
+    const ledgerRes = await fetch(`${API_BASE}/wallets/ledger/${userIds['driver']}`, {
       headers: { Authorization: `Bearer ${financeToken}` }
+
     });
     const ledgerData = await ledgerRes.json();
     assert(ledgerRes.status === 200 && ledgerData.driver, 'Fetch driver ledger failed');
-    assert(parseFloat(ledgerData.pocket_wallet.current_balance) === 75.00, 'Ledger current balance must be 75.00');
-    assert(parseFloat(ledgerData.pocket_wallet.total_topped_up) === 100.00, 'Ledger total topped up must be 100.00');
+    assert(parseFloat(ledgerData.pocket_wallet.current_balance) === 25.00, 'Ledger current balance must be 25.00');
+    assert(parseFloat(ledgerData.pocket_wallet.total_topped_up) === 50.00, 'Ledger total topped up must be 50.00');
     assert(parseFloat(ledgerData.pocket_wallet.total_spent) === 25.00, 'Ledger total spent must be 25.00');
+
 
     console.log(`✅ Step 3.3a: Ledger Modal Driver Info: ${ledgerData.driver.name} (@${ledgerData.driver.username})`);
     console.log(`✅ Step 3.3b: Ledger Banner Summary — Available: $${ledgerData.pocket_wallet.current_balance}, Total Topped Up: $${ledgerData.pocket_wallet.total_topped_up}, Total Spent: $${ledgerData.pocket_wallet.total_spent}`);
@@ -280,7 +321,7 @@ async function runUATJourney() {
     const readOnlyGuardRes = await fetch(`${API_BASE}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${myExecutiveToken}` },
-      body: JSON.stringify({ client_name: 'Illegal Executive Order Creation' })
+      body: JSON.stringify({ tracking_number: 'EXEC-DENIED-101', client_address: 'Illegal Executive Order Creation' })
     });
     assert(readOnlyGuardRes.status === 403, 'Executive Manager read-only guard failed! Mutation allowed.');
     console.log('✅ Step 4.1b: Read-Only Guard Enforcement Verified (403 Forbidden on Executive POST mutation)');
