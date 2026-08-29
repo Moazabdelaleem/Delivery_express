@@ -94,7 +94,7 @@ async function sendPushTokenToBackend(apiBaseUrl, userToken) {
   }
 }
 
-const DEFAULT_HOST = '192.168.1.37';
+const DEFAULT_HOST = 'https://delivery-express-ten.vercel.app';
 
 // 1-Tap Quick Login Preset Accounts
 const DEMO_ACCOUNTS = [
@@ -601,10 +601,10 @@ function MainApp() {
     }
   };
 
-  const [serverHost, setServerHost] = useState(DEFAULT_HOST);
-  const apiBase = process.env.EXPO_PUBLIC_API_URL
-    ? (process.env.EXPO_PUBLIC_API_URL.endsWith('/api') ? process.env.EXPO_PUBLIC_API_URL : `${process.env.EXPO_PUBLIC_API_URL}/api`)
-    : (serverHost.startsWith('http') ? serverHost : `http://${serverHost}:5000/api`);
+  const [serverHost, setServerHost] = useState(process.env.EXPO_PUBLIC_API_URL || DEFAULT_HOST);
+  const apiBase = (serverHost.startsWith('http://') || serverHost.startsWith('https://'))
+    ? (serverHost.endsWith('/api') ? serverHost : `${serverHost.replace(/\/$/, '')}/api`)
+    : `http://${serverHost}:5000/api`;
 
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [user, setUser] = useState(null);
@@ -1009,15 +1009,9 @@ function MainApp() {
 
   useEffect(() => {
     if (!token || !user) return;
-    let socketHost = `http://${serverHost}:5000`;
-    if (process.env.EXPO_PUBLIC_API_URL) {
-      try {
-        const parsedUrl = new URL(process.env.EXPO_PUBLIC_API_URL);
-        socketHost = parsedUrl.origin;
-      } catch (e) {
-        socketHost = process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/?$/, '');
-      }
-    }
+    let socketHost = (serverHost.startsWith('http://') || serverHost.startsWith('https://'))
+      ? serverHost.replace(/\/api\/?$/, '')
+      : `http://${serverHost}:5000`;
     const socket = io(socketHost, {
       transports: ['websocket', 'polling'],
       timeout: 5000
