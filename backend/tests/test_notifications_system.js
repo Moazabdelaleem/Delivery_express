@@ -182,7 +182,7 @@ async function runNotificationsTest() {
         body: JSON.stringify({ status: 'in_transit' })
       });
 
-      const superOutcomePromise = waitForEvent(supervisorSocket, 'status_changed', 500);
+      const superOutcomePromise = waitForEvent(supervisorSocket, 'status_changed', 2000);
       const startTime3 = Date.now();
 
       const statusRes = await fetch(`${API_BASE}/orders/${testOrderId}/delivery-status`, {

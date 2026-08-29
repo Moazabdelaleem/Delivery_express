@@ -475,29 +475,6 @@ export default function DeliveryView({ token, user }) {
           </div>
         </div>
       )}
-            <span className="card-title">✅ Completed Orders</span>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Tracking</th><th>Address</th><th>Amount</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {done.map(o => (
-                  <tr key={o.id}>
-                    <td style={{ fontWeight: 600, color: 'var(--clr-accent)' }}>{o.tracking_number}</td>
-                    <td style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>{o.client_address}</td>
-                    <td className="amount">EGP {parseFloat(o.order_amount).toFixed(2)}</td>
-                    <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* Record Payment Modal */}
       {paymentModal && (
@@ -531,6 +508,7 @@ export default function DeliveryView({ token, user }) {
                   placeholder="Enter partial or full amount"
                   required
                 />
+              </div>
               <PhotoCapture
                 orderId={paymentModal.id}
                 stage="payment_confirmation"

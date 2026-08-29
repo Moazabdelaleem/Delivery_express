@@ -260,8 +260,9 @@ export default function InventoryView({ token }) {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
       {/* Handoff Confirmation Modal */}
       {noteModal && (
