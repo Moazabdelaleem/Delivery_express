@@ -2043,16 +2043,18 @@ const parseSafeJson = async (res) => {
             {activeAuthTab === 'login' ? t('loginSubtitle') : t('registerSubtitle')}
           </Text>
 
-          <View style={[styles.hostBanner, theme.inputBg, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 10 }]}>
-            <Text style={[styles.hostLabel, theme.text]}>{t('serverIpLabel')}</Text>
-            <TextInput
-              style={[styles.hostInput, theme.text]}
-              value={serverHost}
-              onChangeText={setServerHost}
-              placeholder="192.168.1.37"
-              autoCapitalize="none"
-            />
-          </View>
+          {__DEV__ && (
+            <View style={[styles.hostBanner, theme.inputBg, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 10 }]}>
+              <Text style={[styles.hostLabel, theme.text]}>{t('serverIpLabel')}</Text>
+              <TextInput
+                style={[styles.hostInput, theme.text]}
+                value={serverHost}
+                onChangeText={setServerHost}
+                placeholder="192.168.1.37"
+                autoCapitalize="none"
+              />
+            </View>
+          )}
         </View>
 
         <ScrollView style={styles.formContainer} contentContainerStyle={{ paddingBottom: 50 }}>
@@ -2062,26 +2064,28 @@ const parseSafeJson = async (res) => {
             </View>
           ) : null}
 
-          <View style={{ marginBottom: 14 }}>
-            <Text style={[styles.inputLabel, theme.text, { fontSize: 11, fontWeight: '800' }, isRTL && styles.rtlText]}>
-              {t('quickLoginsTitle')}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
-              {DEMO_ACCOUNTS.map((acc) => (
-                <TouchableOpacity
-                  key={acc.username}
-                  style={[styles.demoChip, { backgroundColor: acc.color }]}
-                  onPress={() => {
-                    setUsername(acc.username);
-                    setPassword('Admin123!');
-                    handleLogin(acc.username, 'Admin123!');
-                  }}
-                >
-                  <Text style={styles.demoChipText}>{acc.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+          {__DEV__ && (
+            <View style={{ marginBottom: 14 }}>
+              <Text style={[styles.inputLabel, theme.text, { fontSize: 11, fontWeight: '800' }, isRTL && styles.rtlText]}>
+                {t('quickLoginsTitle')}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+                {DEMO_ACCOUNTS.map((acc) => (
+                  <TouchableOpacity
+                    key={acc.username}
+                    style={[styles.demoChip, { backgroundColor: acc.color }]}
+                    onPress={() => {
+                      setUsername(acc.username);
+                      setPassword('Admin123!');
+                      handleLogin(acc.username, 'Admin123!');
+                    }}
+                  >
+                    <Text style={styles.demoChipText}>{acc.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {activeAuthTab === 'login' ? (
             <View style={[styles.card, theme.cardBg]}>
