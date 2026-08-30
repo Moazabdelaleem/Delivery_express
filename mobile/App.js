@@ -2064,28 +2064,26 @@ const parseSafeJson = async (res) => {
             </View>
           ) : null}
 
-          {__DEV__ && (
-            <View style={{ marginBottom: 14 }}>
-              <Text style={[styles.inputLabel, theme.text, { fontSize: 11, fontWeight: '800' }, isRTL && styles.rtlText]}>
-                {t('quickLoginsTitle')}
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
-                {DEMO_ACCOUNTS.map((acc) => (
-                  <TouchableOpacity
-                    key={acc.username}
-                    style={[styles.demoChip, { backgroundColor: acc.color }]}
-                    onPress={() => {
-                      setUsername(acc.username);
-                      setPassword('Admin123!');
-                      handleLogin(acc.username, 'Admin123!');
-                    }}
-                  >
-                    <Text style={styles.demoChipText}>{acc.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+          <View style={{ marginBottom: 14 }}>
+            <Text style={[styles.inputLabel, theme.text, { fontSize: 11, fontWeight: '800' }, isRTL && styles.rtlText]}>
+              {t('quickLoginsTitle')}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 4 }}>
+              {DEMO_ACCOUNTS.map((acc) => (
+                <TouchableOpacity
+                  key={acc.username}
+                  style={[styles.demoChip, { backgroundColor: acc.color }]}
+                  onPress={() => {
+                    setUsername(acc.username);
+                    setPassword('Admin123!');
+                    handleLogin(acc.username, 'Admin123!');
+                  }}
+                >
+                  <Text style={styles.demoChipText}>{acc.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
 
           {activeAuthTab === 'login' ? (
             <View style={[styles.card, theme.cardBg]}>
