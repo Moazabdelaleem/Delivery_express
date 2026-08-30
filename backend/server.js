@@ -168,11 +168,11 @@ process.on('uncaughtException', (err) => {
 });
 
 if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
-  throw new Error('DATABASE_URL environment variable is required.');
+  console.warn('⚠️ DATABASE_URL environment variable is missing on server.');
 }
 
 if (!process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required.');
+  console.warn('⚠️ JWT_SECRET environment variable is missing on server.');
 }
 
 const PORT = process.env.PORT || 5000;

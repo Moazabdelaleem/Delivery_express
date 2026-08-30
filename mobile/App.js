@@ -1077,7 +1077,8 @@ function MainApp() {
         showToast(`${dt('Welcome back')}, ${dt(data.user.name)}!`);
       }
     } catch (err) {
-      setAuthError(`${t('networkError')} (${serverHost}:5000)`);
+      const displayHost = (serverHost.startsWith('http://') || serverHost.startsWith('https://')) ? serverHost : `${serverHost}:5000`;
+      setAuthError(`${t('networkError')} (${displayHost})`);
     } finally {
       setLoading(false);
     }
