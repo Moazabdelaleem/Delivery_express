@@ -29,89 +29,94 @@ const corsOptions = {
   credentials: true
 };
 
-// Socket.io Setup
-const io = new Server(server, {
-  cors: corsOptions
-});
-
-const { bufferEvent, replayPendingEvents, extractUserId } = require('./utils/socketReplay');
-
-app.set('io', io);
-app.set('bufferEvent', bufferEvent);
-
-// Track active driver location timestamps for 2-minute watchdog
-const driverLastSeenMap = new Map();
-
-io.on('connection', (socket) => {
-  const userId = extractUserId(socket);
-  if (userId) {
-    socket.userId = userId;
-    socket.join(`user_${userId}`);
-    console.log(`⚡ Socket client connected: ${socket.id} (User ID: ${userId})`);
-    replayPendingEvents(socket, userId);
-  } else {
-    console.log('⚡ Socket client connected:', socket.id, '(Unauthenticated)');
-  }
-
-  socket.on('identify', (data) => {
-    const id = data?.userId || data?.user_id || extractUserId({ handshake: { auth: { token: data?.token } } });
-    if (id) {
-      socket.userId = id;
-      socket.join(`user_${id}`);
-      console.log(`🔑 Socket client identified: ${socket.id} (User ID: ${id})`);
-      replayPendingEvents(socket, id);
-    }
+let io = null;
+if (process.env.VERCEL !== '1') {
+  io = new Server(server, {
+    cors: corsOptions
   });
 
-  socket.on('driver_location_updated', async (data) => {
-    const driverId = data?.delivery_guy_id || socket.userId;
-    if (driverId) {
-      try {
-        const shiftCheck = await db.query(
-          `SELECT id FROM driver_shifts WHERE delivery_guy_id = $1 AND clock_out_at IS NULL`,
-          [driverId]
-        );
-        if (shiftCheck.rows.length > 0) {
-          driverLastSeenMap.set(driverId, {
-            driver_id: driverId,
-            driver_name: data.driver_name || 'Driver',
-            last_seen_at: Date.now(),
-            lat: data.lat,
-            lng: data.lng
-          });
-          io.emit('driver_location_updated', data);
-        } else {
-          console.warn(`⚠️ Rejected socket location update for driver ${driverId}: No active shift`);
+  const { bufferEvent, replayPendingEvents, extractUserId } = require('./utils/socketReplay');
+
+  app.set('io', io);
+  app.set('bufferEvent', bufferEvent);
+
+  // Track active driver location timestamps for 2-minute watchdog
+  const driverLastSeenMap = new Map();
+
+  io.on('connection', (socket) => {
+    const userId = extractUserId(socket);
+    if (userId) {
+      socket.userId = userId;
+      socket.join(`user_${userId}`);
+      console.log(`⚡ Socket client connected: ${socket.id} (User ID: ${userId})`);
+      replayPendingEvents(socket, userId);
+    } else {
+      console.log('⚡ Socket client connected:', socket.id, '(Unauthenticated)');
+    }
+
+    socket.on('identify', (data) => {
+      const id = data?.userId || data?.user_id || extractUserId({ handshake: { auth: { token: data?.token } } });
+      if (id) {
+        socket.userId = id;
+        socket.join(`user_${id}`);
+        console.log(`🔑 Socket client identified: ${socket.id} (User ID: ${id})`);
+        replayPendingEvents(socket, id);
+      }
+    });
+
+    socket.on('driver_location_updated', async (data) => {
+      const driverId = data?.delivery_guy_id || socket.userId;
+      if (driverId) {
+        try {
+          const shiftCheck = await db.query(
+            `SELECT id FROM driver_shifts WHERE delivery_guy_id = $1 AND clock_out_at IS NULL`,
+            [driverId]
+          );
+          if (shiftCheck.rows.length > 0) {
+            driverLastSeenMap.set(driverId, {
+              driver_id: driverId,
+              driver_name: data.driver_name || 'Driver',
+              last_seen_at: Date.now(),
+              lat: data.lat,
+              lng: data.lng
+            });
+            io.emit('driver_location_updated', data);
+          } else {
+            console.warn(`⚠️ Rejected socket location update for driver ${driverId}: No active shift`);
+          }
+        } catch (err) {
+          console.error('Error verifying shift for socket location update:', err.message);
         }
-      } catch (err) {
-        console.error('Error verifying shift for socket location update:', err.message);
+      }
+    });
+
+    socket.on('disconnect', () => {
+      console.log('🔌 Socket client disconnected:', socket.id, socket.userId ? `(User ID: ${socket.userId})` : '');
+    });
+  });
+
+  // 2-Minute GPS Disconnection Watchdog Check (runs every 30 seconds)
+  setInterval(async () => {
+    const TWO_MINUTES_MS = 2 * 60 * 1000;
+    const now = Date.now();
+
+    for (const [driverId, info] of driverLastSeenMap.entries()) {
+      if (now - info.last_seen_at > TWO_MINUTES_MS && !info.disconnected_alert_sent) {
+        info.disconnected_alert_sent = true;
+        console.warn(`⚠️ GPS signal lost for active driver '${info.driver_name}' (ID: ${driverId}) for > 2 minutes.`);
+        io.emit('gps_disconnected', {
+          delivery_guy_id: driverId,
+          driver_name: info.driver_name,
+          last_seen_at: new Date(info.last_seen_at).toISOString(),
+          message: `GPS signal lost for driver ${info.driver_name} (no updates for >2 minutes).`
+        });
       }
     }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('🔌 Socket client disconnected:', socket.id, socket.userId ? `(User ID: ${socket.userId})` : '');
-  });
-});
-
-// 2-Minute GPS Disconnection Watchdog Check (runs every 30 seconds)
-setInterval(async () => {
-  const TWO_MINUTES_MS = 2 * 60 * 1000;
-  const now = Date.now();
-
-  for (const [driverId, info] of driverLastSeenMap.entries()) {
-    if (now - info.last_seen_at > TWO_MINUTES_MS && !info.disconnected_alert_sent) {
-      info.disconnected_alert_sent = true;
-      console.warn(`⚠️ GPS signal lost for active driver '${info.driver_name}' (ID: ${driverId}) for > 2 minutes.`);
-      io.emit('gps_disconnected', {
-        delivery_guy_id: driverId,
-        driver_name: info.driver_name,
-        last_seen_at: new Date(info.last_seen_at).toISOString(),
-        message: `GPS signal lost for driver ${info.driver_name} (no updates for >2 minutes).`
-      });
-    }
-  }
-}, 30000);
+  }, 30000);
+} else {
+  app.set('io', null);
+  app.set('bufferEvent', () => {});
+}
 
 // Middleware
 app.use(cors(corsOptions));
