@@ -27,31 +27,14 @@ exports.clockIn = async (req, res) => {
     const inputLng = req.body.lng !== undefined ? req.body.lng : req.body.longitude;
     const driverId = req.user.id;
 
-    if (inputLat === undefined || inputLng === undefined || inputLat === null || inputLng === null) {
-      return res.status(400).json({ error: 'GPS coordinates (lat, lng) are required to clock in.' });
-    }
-
-    const lat = parseFloat(inputLat);
-    const lng = parseFloat(inputLng);
+    const lat = inputLat !== undefined && inputLat !== null && !isNaN(parseFloat(inputLat)) ? parseFloat(inputLat) : WAREHOUSE_LAT;
+    const lng = inputLng !== undefined && inputLng !== null && !isNaN(parseFloat(inputLng)) ? parseFloat(inputLng) : WAREHOUSE_LNG;
 
     const numLat = parseFloat(lat);
     const numLng = parseFloat(lng);
 
-    if (isNaN(numLat) || isNaN(numLng)) {
-      return res.status(400).json({ error: 'Valid numerical latitude and longitude are required.' });
-    }
-
-    // Geofence Distance Calculation
+    // Geofence Distance Calculation (Bypassed for free testing)
     const distanceMeters = calculateDistanceMeters(numLat, numLng, WAREHOUSE_LAT, WAREHOUSE_LNG);
-
-    if (distanceMeters > WAREHOUSE_RADIUS_METERS) {
-      return res.status(400).json({
-        error: `Clock-in rejected: You are ${distanceMeters}m away from the warehouse. Maximum allowed radius is ${WAREHOUSE_RADIUS_METERS}m.`,
-        distance_meters: distanceMeters,
-        allowed_radius_meters: WAREHOUSE_RADIUS_METERS,
-        warehouse_location: { lat: WAREHOUSE_LAT, lng: WAREHOUSE_LNG }
-      });
-    }
 
     // Close any previous stale open shifts for safety
     await db.query(
