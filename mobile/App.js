@@ -601,7 +601,14 @@ function MainApp() {
     }
   };
 
-  const [serverHost, setServerHost] = useState(process.env.EXPO_PUBLIC_API_URL || DEFAULT_HOST);
+  const [serverHost, setServerHost] = useState(DEFAULT_HOST);
+
+  useEffect(() => {
+    if (!serverHost || serverHost.includes('192.168.')) {
+      setServerHost(DEFAULT_HOST);
+    }
+  }, []);
+
   const apiBase = (serverHost.startsWith('http://') || serverHost.startsWith('https://'))
     ? (serverHost.endsWith('/api') ? serverHost : `${serverHost.replace(/\/$/, '')}/api`)
     : `http://${serverHost}:5000/api`;
