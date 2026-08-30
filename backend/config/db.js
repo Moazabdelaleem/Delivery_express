@@ -37,13 +37,15 @@ const getClient = async () => {
 if (process.env.NODE_ENV !== 'production') {
   (async () => {
     try {
-      await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);');
-      await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);');
-      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
-      await pgPool.query('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
-      await pgPool.query('ALTER TABLE pocket_expenses ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL;');
-      // Ensure tracking_number is unique (order number is the PK-equivalent identifier)
-      await pgPool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tracking_number_unique ON orders (tracking_number);');
+      if (pgPool) {
+        await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);');
+        await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);');
+        await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
+        await pgPool.query('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
+        await pgPool.query('ALTER TABLE pocket_expenses ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL;');
+        // Ensure tracking_number is unique (order number is the PK-equivalent identifier)
+        await pgPool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tracking_number_unique ON orders (tracking_number);');
+      }
     } catch (err) {
       console.error('Schema auto-patch note:', err.message);
     }
