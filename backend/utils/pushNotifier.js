@@ -1,8 +1,16 @@
-const { Expo } = require('expo-server-sdk');
 const db = require('../config/db');
 
-// Initialize Expo SDK client
-const expo = new Expo();
+let expoInstance = null;
+let ExpoClass = null;
+
+async function getExpoInstance() {
+  if (!expoInstance) {
+    const mod = await import('expo-server-sdk');
+    ExpoClass = mod.Expo || mod.default?.Expo || mod.default;
+    expoInstance = new ExpoClass();
+  }
+  return { expo: expoInstance, Expo: ExpoClass };
+}
 
 /**
  * Best-effort helper to send mobile push notifications via Expo Push Service.
@@ -12,6 +20,8 @@ async function sendPushNotification(userId, title, body, data = {}) {
   if (!userId) return;
 
   try {
+    const { expo, Expo } = await getExpoInstance();
+
     const userRes = await db.query(
       'SELECT push_token FROM users WHERE id = $1',
       [userId]
@@ -20,7 +30,7 @@ async function sendPushNotification(userId, title, body, data = {}) {
     if (userRes.rows.length === 0) return;
     const pushToken = userRes.rows[0].push_token;
 
-    if (!pushToken || !Expo.isExpoPushToken(pushToken)) {
+    if (!pushToken || !Expo || !Expo.isExpoPushToken(pushToken)) {
       // User has not granted notification permission or token is missing/invalid
       return;
     }
