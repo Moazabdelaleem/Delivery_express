@@ -7,6 +7,7 @@ async function cleanupExtraDrivers() {
   try {
     // 1. Get original Sami Driver
     const samiRes = await db.query("SELECT id, username, name FROM users WHERE role = 'delivery_guy' AND username = 'sami_delivery' LIMIT 1");
+    let samiId;
     if (!samiRes.rows.length) {
       console.log('⚠️ Original sami_delivery account not found. Creating it...');
       const bcrypt = require('bcryptjs');
@@ -40,7 +41,8 @@ async function cleanupExtraDrivers() {
 
       const extraIds = extraDrivers.rows.map(d => d.id);
 
-      // Delete associated wallet records & shift logs for extra drivers
+      // Delete associated wallet & shift logs for extra drivers
+      await db.query(`DELETE FROM wallet_transactions WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM collection_wallets WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM pocket_wallets WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM driver_shifts WHERE delivery_guy_id = ANY($1);`, [extraIds]);
