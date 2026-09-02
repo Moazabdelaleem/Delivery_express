@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getMyDeliveries, updateDeliveryStatus, getWalletSummary, logExpense, updateOnlineStatus, getDriverLedger, recordPayment, getDriverReturnPickups, clockIn, clockOut } from '../api.js';
-import { DELIVERY_OUTCOMES, getOutcomeByKey } from '../deliveryOutcomes.js';
+import { DELIVERY_OUTCOMES, DELIVERY_OUTCOMES_STEP1, DELIVERY_OUTCOMES_STEP2, COLLECTION_FILTER_MAP, getValidCollectionOutcomes, getOutcomeByKey } from '../deliveryOutcomes.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import VoiceFeedbackRecorder from '../components/VoiceFeedbackRecorder.jsx';
 import { toast } from '../App.jsx';
@@ -24,10 +24,13 @@ export default function DeliveryView({ token, user }) {
 
   const [paymentModal, setPaymentModal] = useState(null); // order to record payment for
   const [payAmt, setPayAmt]             = useState('');
-  const [payMethod, setPayMethod]       = useState('cash');
+  const [payMethod, setPayMethod]       = useState(''); // Explicit selection required (no default guess!)
   const [paymentAtt, setPaymentAtt]     = useState(null);
 
   const [outcomeModal, setOutcomeModal] = useState(null); // order to select status outcome for
+  const [outcomeStep, setOutcomeStep]   = useState(1);
+  const [step1Outcome, setStep1Outcome] = useState('full');
+  const [step2Outcome, setStep2Outcome] = useState('cash_full');
   const [outcomeKey, setOutcomeKey]     = useState('full_cash_full');
   const [delItemAmt, setDelItemAmt]     = useState('');
   const [retItemAmt, setRetItemAmt]     = useState('');
@@ -135,6 +138,10 @@ export default function DeliveryView({ token, user }) {
 
   const handleRecordPayment = async (e) => {
     e.preventDefault();
+    if (!payMethod) {
+      toast.error('Payment method selection is required.');
+      return;
+    }
     if (!payAmt || parseFloat(payAmt) <= 0) {
       toast.error('Valid positive payment amount is required.');
       return;
@@ -151,7 +158,7 @@ export default function DeliveryView({ token, user }) {
         proof_attachment_id: paymentAtt ? paymentAtt.id : undefined
       }, token);
       toast.success('Payment submitted for Finance review!');
-      setPaymentModal(null); setPayAmt(''); setPayMethod('cash'); setPaymentAtt(null);
+      setPaymentModal(null); setPayAmt(''); setPayMethod(''); setPaymentAtt(null);
       fetchData();
     } catch (err) {
       toast.error(err.message);
@@ -160,21 +167,12 @@ export default function DeliveryView({ token, user }) {
 
   const handleSubmitOutcome = async (e) => {
     e.preventDefault();
-    const outcomeObj = getOutcomeByKey(outcomeKey);
-    if (!outcomeObj) {
-      toast.error('Invalid status outcome selected.');
-      return;
-    }
-
     const payload = {
-      outcome_key: outcomeKey,
-      status: outcomeObj.status,
-      delivery_outcome: outcomeObj.delivery_outcome,
-      collection_outcome: outcomeObj.collection_outcome,
-      payment_method: outcomeObj.payment_method
+      delivery_outcome: step1Outcome,
+      collection_outcome: step2Outcome
     };
 
-    if (outcomeObj.requires_partial_breakdown) {
+    if (step1Outcome === 'partial') {
       const delVal = parseFloat(delItemAmt || 0);
       const retVal = parseFloat(retItemAmt || 0);
       const orderTotal = parseFloat(outcomeModal.order_amount || 0);
@@ -190,11 +188,21 @@ export default function DeliveryView({ token, user }) {
     }
 
     try {
-      await updateDeliveryStatus(outcomeModal.id, payload, token);
-      toast.success(`Order status updated: ${outcomeObj.label_ar}`);
+      const targetOrder = outcomeModal;
+      const finalStatus = ['full', 'partial'].includes(step1Outcome) ? 'delivered' : 'delivery_failed';
+      await updateDeliveryStatus(targetOrder.id, { status: finalStatus, ...payload }, token);
+      toast.success(`Order status updated successfully.`);
       setOutcomeModal(null);
       setDelItemAmt(''); setRetItemAmt(''); setRetQty(''); setRetNotes('');
       fetchData();
+
+      // Auto-trigger Record Payment modal if collection_outcome !== 'none'
+      if (step2Outcome !== 'none') {
+        setPaymentModal(targetOrder);
+        setPayAmt(targetOrder.outstanding_balance ? String(targetOrder.outstanding_balance) : String(targetOrder.order_amount));
+        setPayMethod(''); // Explicit selection required (no default guess!)
+        setPaymentAtt(null);
+      }
     } catch (err) {
       toast.error(err.message);
     }
@@ -326,8 +334,8 @@ export default function DeliveryView({ token, user }) {
                 submitting={submitting}
                 onChangeStatus={changeStatus}
                 onFail={(id) => setFailModal(id)}
-                onSelectOutcome={(orderObj) => { setOutcomeModal(orderObj); setOutcomeKey('full_cash_full'); setDelItemAmt(String(orderObj.order_amount)); setRetItemAmt('0'); setRetQty(''); setRetNotes(''); }}
-                onRecordPayment={(orderObj) => { setPaymentModal(orderObj); setPayAmt(orderObj.outstanding_balance ? String(orderObj.outstanding_balance) : String(orderObj.order_amount)); setPayMethod('cash'); }}
+                onSelectOutcome={(orderObj) => { setOutcomeModal(orderObj); setOutcomeStep(1); setStep1Outcome('full'); setStep2Outcome('cash_full'); setDelItemAmt(String(orderObj.order_amount)); setRetItemAmt('0'); setRetQty(''); setRetNotes(''); }}
+                onRecordPayment={(orderObj) => { setPaymentModal(orderObj); setPayAmt(orderObj.outstanding_balance ? String(orderObj.outstanding_balance) : String(orderObj.order_amount)); setPayMethod(''); setPaymentAtt(null); }}
               />
             ))}
           </div>
@@ -362,121 +370,191 @@ export default function DeliveryView({ token, user }) {
         </div>
       )}
 
-      {/* Outcome Status Selector Modal */}
+      {/* Outcome Status Selector Modal (2-Step Wizard) */}
       {outcomeModal && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 520 }}>
-            <h2 className="modal-title">📋 Select Delivery Outcome — #{outcomeModal.tracking_number}</h2>
-            <p style={{ color: 'var(--clr-text-muted)', fontSize: 13, marginBottom: 14 }}>
-              Address: <strong>{outcomeModal.client_address}</strong> | Total Amount: <strong>EGP {parseFloat(outcomeModal.order_amount).toFixed(2)}</strong>
-            </p>
-            <form onSubmit={handleSubmitOutcome}>
-              <div className="form-group">
-                <label className="form-label">Delivery Outcome Status (حالة التسليم)</label>
-                <select
-                  className="form-select"
-                  value={outcomeKey}
-                  onChange={e => {
-                    const k = e.target.value;
-                    setOutcomeKey(k);
-                    const item = getOutcomeByKey(k);
-                    if (item && item.requires_partial_breakdown) {
-                      setDelItemAmt('');
-                      setRetItemAmt(String(outcomeModal.order_amount));
-                    }
-                  }}
-                >
-                  {DELIVERY_OUTCOMES.map((item, idx) => (
-                    <option key={item.key} value={item.key}>
-                      {idx + 1}. {item.label_ar} ({item.label_en})
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div className="modal" style={{ maxWidth: 540 }}>
+            {outcomeStep === 1 ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 1 of 2: How was it delivered? (حالة التسليم)</h2>
+                  <span style={{ background: 'var(--clr-accent)', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>1 / 2</span>
+                </div>
+                <p style={{ color: 'var(--clr-text-muted)', fontSize: 13, marginBottom: 14 }}>
+                  Order: <strong>#{outcomeModal.tracking_number}</strong> | Address: <strong>{outcomeModal.client_address}</strong>
+                </p>
 
-              {/* Partial Delivery Breakdown Section */}
-              {getOutcomeByKey(outcomeKey)?.requires_partial_breakdown && (
-                <div style={{ background: 'var(--clr-bg-subtle)', padding: 12, borderRadius: 'var(--r-sm)', marginBottom: 14, border: '1px solid var(--clr-border)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--clr-warning)' }}>
-                    📦 Partial Delivery Details (بيانات التسليم الجزئي)
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div className="form-group">
-                      <label className="form-label">Delivered Amount (مبلغ المقبول)</label>
-                      <input
-                        className="form-input"
-                        type="number" min="0" step="0.01"
-                        placeholder="0.00"
-                        value={delItemAmt}
-                        onChange={e => {
-                          const v = e.target.value;
-                          setDelItemAmt(v);
-                          const total = parseFloat(outcomeModal.order_amount || 0);
-                          if (v !== '' && !isNaN(parseFloat(v))) {
-                            setRetItemAmt(String(Math.max(0, total - parseFloat(v))));
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Returned Amount (مبلغ الراجع)</label>
-                      <input
-                        className="form-input"
-                        type="number" min="0" step="0.01"
-                        placeholder="0.00"
-                        value={retItemAmt}
-                        onChange={e => setRetItemAmt(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
-                    <div className="form-group">
-                      <label className="form-label">Returned Qty (الكمية)</label>
-                      <input
-                        className="form-input"
-                        type="number" min="0" step="1"
-                        placeholder="0"
-                        value={retQty}
-                        onChange={e => setRetQty(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Return Notes (ملاحظات الراجع)</label>
-                      <input
-                        className="form-input"
-                        placeholder="e.g. Size mismatch / item rejected"
-                        value={retNotes}
-                        onChange={e => setRetNotes(e.target.value)}
-                      />
-                    </div>
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Select Delivery Outcome:</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {DELIVERY_OUTCOMES_STEP1.map((item) => {
+                      const isSelected = step1Outcome === item.value;
+                      return (
+                        <div
+                          key={item.value}
+                          onClick={() => {
+                            setStep1Outcome(item.value);
+                            const validStep2 = getValidCollectionOutcomes(item.value);
+                            if (validStep2.length > 0) {
+                              setStep2Outcome(validStep2[0].value);
+                            }
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 'var(--r-sm)',
+                            border: isSelected ? '2px solid var(--clr-accent)' : '1px solid var(--clr-border)',
+                            background: isSelected ? 'rgba(37,99,235,0.08)' : 'var(--clr-bg-subtle)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontWeight: isSelected ? 700 : 500
+                          }}
+                        >
+                          <span>{item.label_ar} ({item.label_en})</span>
+                          {isSelected && <span style={{ color: 'var(--clr-accent)', fontWeight: 'bold' }}>✓</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              )}
 
-              <PhotoCapture
-                orderId={outcomeModal.id}
-                stage="customer_delivery"
-                required={false}
-                token={token}
-                onAttachmentUploaded={(att) => setDeliveryAtt(att)}
-                label="📷 Customer Proof of Delivery Photo (Optional)"
-              />
+                {/* Partial Delivery Breakdown Section at End of Step 1 */}
+                {step1Outcome === 'partial' && (
+                  <div style={{ background: 'var(--clr-bg-subtle)', padding: 12, borderRadius: 'var(--r-sm)', marginBottom: 14, border: '1px solid var(--clr-border)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--clr-warning)' }}>
+                      📦 Partial Delivery Details (بيانات التسليم الجزئي)
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div className="form-group">
+                        <label className="form-label">Delivered Amount (مبلغ المقبول)</label>
+                        <input
+                          className="form-input"
+                          type="number" min="0" step="0.01"
+                          placeholder="0.00"
+                          value={delItemAmt}
+                          onChange={e => {
+                            const v = e.target.value;
+                            setDelItemAmt(v);
+                            const total = parseFloat(outcomeModal.order_amount || 0);
+                            if (v !== '' && !isNaN(parseFloat(v))) {
+                              setRetItemAmt(String(Math.max(0, total - parseFloat(v))));
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Returned Amount (مبلغ الراجع)</label>
+                        <input
+                          className="form-input"
+                          type="number" min="0" step="0.01"
+                          placeholder="0.00"
+                          value={retItemAmt}
+                          onChange={e => setRetItemAmt(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+                      <div className="form-group">
+                        <label className="form-label">Returned Qty (الكمية)</label>
+                        <input
+                          className="form-input"
+                          type="number" min="0" step="1"
+                          placeholder="0"
+                          value={retQty}
+                          onChange={e => setRetQty(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Return Notes (ملاحظات الراجع)</label>
+                        <input
+                          className="form-input"
+                          placeholder="e.g. Size mismatch / item rejected"
+                          value={retNotes}
+                          onChange={e => setRetNotes(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              <VoiceFeedbackRecorder
-                orderId={outcomeModal.id}
-                token={token}
-              />
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setOutcomeModal(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Confirm Outcome</button>
+                <div className="modal-actions" style={{ marginTop: 16 }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setOutcomeModal(null)}>Cancel</button>
+                  <button type="button" className="btn btn-primary" onClick={() => setOutcomeStep(2)}>Next →</button>
+                </div>
               </div>
-            </form>
+            ) : (
+              <form onSubmit={handleSubmitOutcome}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 2 of 2: What was collected? (حالة التحصيل)</h2>
+                  <span style={{ background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>2 / 2</span>
+                </div>
+
+                {/* Step 1 Summary Badge Pill */}
+                <div style={{ background: 'rgba(37,99,235,0.08)', padding: '10px 14px', borderRadius: 'var(--r-sm)', border: '1px solid #bfdbfe', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: 'var(--clr-accent)', fontWeight: 600, display: 'block' }}>Delivery Outcome (Step 1):</span>
+                    <strong style={{ fontSize: 13 }}>
+                      {DELIVERY_OUTCOMES_STEP1.find(s => s.value === step1Outcome)?.label_ar} ({DELIVERY_OUTCOMES_STEP1.find(s => s.value === step1Outcome)?.label_en})
+                    </strong>
+                  </div>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setOutcomeStep(1)}>Change</button>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Select Collection Outcome:</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {getValidCollectionOutcomes(step1Outcome).map((item) => {
+                      const isSelected = step2Outcome === item.value;
+                      return (
+                        <div
+                          key={item.value}
+                          onClick={() => setStep2Outcome(item.value)}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 'var(--r-sm)',
+                            border: isSelected ? '2px solid #10b981' : '1px solid var(--clr-border)',
+                            background: isSelected ? 'rgba(16,185,129,0.08)' : 'var(--clr-bg-subtle)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            fontWeight: isSelected ? 700 : 500
+                          }}
+                        >
+                          <span>{item.label_ar} ({item.label_en})</span>
+                          {isSelected && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <PhotoCapture
+                  orderId={outcomeModal.id}
+                  stage="customer_delivery"
+                  required={false}
+                  token={token}
+                  onAttachmentUploaded={(att) => setDeliveryAtt(att)}
+                  label="📷 Customer Proof of Delivery Photo (Optional)"
+                />
+
+                <VoiceFeedbackRecorder
+                  orderId={outcomeModal.id}
+                  token={token}
+                />
+
+                <div className="modal-actions" style={{ marginTop: 16 }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setOutcomeStep(1)}>← Back</button>
+                  <button type="submit" className="btn btn-primary">Confirm Outcome</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
 
-      {/* Record Payment Modal */}
+      {/* Record Payment Modal (Explicit Picker - No Default Guess) */}
       {paymentModal && (
         <div className="modal-overlay">
           <div className="modal">
@@ -487,13 +565,14 @@ export default function DeliveryView({ token, user }) {
             </p>
             <form onSubmit={handleRecordPayment}>
               <div className="form-group">
-                <label className="form-label">Payment Method</label>
-                <select className="form-select" value={payMethod} onChange={e => setPayMethod(e.target.value)}>
-                  <option value="cash">💵 Cash</option>
-                  <option value="e_wallet">📱 E-Wallet</option>
-                  <option value="instapay">⚡ InstaPay</option>
-                  <option value="vodafone_cash">🔴 Vodafone Cash</option>
-                  <option value="other">🌐 Other</option>
+                <label className="form-label">Payment Method (Required)</label>
+                <select className="form-select" value={payMethod} onChange={e => setPayMethod(e.target.value)} required>
+                  <option value="" disabled>-- Select Payment Method --</option>
+                  <option value="cash">💵 Cash / نقداً</option>
+                  <option value="e_wallet">📱 E-Wallet / محفظة إلكترونية</option>
+                  <option value="instapay">⚡ InstaPay / إنستا باي</option>
+                  <option value="vodafone_cash">🔴 Vodafone Cash / فودافون كاش</option>
+                  <option value="other">🌐 Other / أخرى</option>
                 </select>
               </div>
               <div className="form-group">
@@ -509,18 +588,20 @@ export default function DeliveryView({ token, user }) {
                   required
                 />
               </div>
-              <PhotoCapture
-                orderId={paymentModal.id}
-                stage="payment_confirmation"
-                required={['e_wallet', 'instapay', 'vodafone_cash'].includes(payMethod)}
-                token={token}
-                onAttachmentUploaded={(att) => setPaymentAtt(att)}
-                label={['e_wallet', 'instapay', 'vodafone_cash'].includes(payMethod) ? '📸 Payment Transfer Proof Photo' : '📷 Optional Receipt Photo'}
-              />
+              {payMethod && (
+                <PhotoCapture
+                  orderId={paymentModal.id}
+                  stage="payment_confirmation"
+                  required={['e_wallet', 'instapay', 'vodafone_cash'].includes(payMethod)}
+                  token={token}
+                  onAttachmentUploaded={(att) => setPaymentAtt(att)}
+                  label={['e_wallet', 'instapay', 'vodafone_cash'].includes(payMethod) ? '📸 Payment Transfer Proof Photo' : '📷 Optional Receipt Photo'}
+                />
+              )}
 
               <div className="modal-actions">
                 <button type="button" className="btn btn-ghost" onClick={() => setPaymentModal(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Submit Payment</button>
+                <button type="submit" className="btn btn-primary" disabled={!payMethod}>Submit Payment</button>
               </div>
             </form>
           </div>

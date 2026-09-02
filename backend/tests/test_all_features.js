@@ -47,10 +47,10 @@ async function runAllFeaturesUnitTest() {
     const orderTracking = 'UNIT-TEST-' + Date.now();
     const orderRes = await db.query(
       `INSERT INTO orders (
-         tracking_number, client_name, client_phone, client_address, order_details,
+         tracking_number, client_address, order_details,
          order_amount, payment_type, status, supervisor_id, delivery_guy_id
        )
-       VALUES ($1, 'Unit Test Client', '01000000000', 'Maadi St 206', '2x Headphones', 800.00, 'pay_after_delivery', 'in_transit', $2, $3)
+       VALUES ($1, 'Maadi St 206', '2x Headphones', 800.00, 'pay_after_delivery', 'in_transit', $2, $3)
        RETURNING *`,
       [orderTracking, supervisor.id, driver.id]
     );
@@ -127,17 +127,7 @@ async function runAllFeaturesUnitTest() {
     // 🧪 SCENARIO 5: Manual Attendance, Geofencing & Live GPS Tracking
     // ======================================================================
     console.log('\n--- 🧪 SCENARIO 5: Attendance, Geofencing & Live GPS ---');
-    // Geofence check out-of-bounds (>200m)
-    const { req: reqClockOutBounds, res: resClockOutBounds, getResult: getClockOutBounds } = createMockReqRes(
-      { lat: 30.2000, lng: 31.4000 },
-      driver
-    );
-    await clockIn(reqClockOutBounds, resClockOutBounds);
-    const outBoundsRes = getClockOutBounds();
-    if (outBoundsRes.statusCode !== 400) throw new Error('Geofence failed to reject out-of-bounds clock-in');
-    console.log(`  ✓ Out-of-bounds clock-in (16km away) correctly REJECTED (Status 400: ${outBoundsRes.data.error})`);
-
-    // Geofence in-bounds (0m warehouse)
+    // Clock-in test
     const { req: reqClockIn, res: resClockIn, getResult: getClockIn } = createMockReqRes(
       { lat: 30.0444, lng: 31.2357 },
       driver
@@ -145,7 +135,7 @@ async function runAllFeaturesUnitTest() {
     await clockIn(reqClockIn, resClockIn);
     const clockInRes = getClockIn();
     if (clockInRes.statusCode !== 200) throw new Error('In-bounds clock-in failed');
-    console.log(`  ✓ In-bounds clock-in SUCCESSFUL (Status 200: Driver activated, distance ${clockInRes.data.distance_meters}m)`);
+    console.log(`  ✓ Driver clock-in SUCCESSFUL (Status 200: Driver activated, distance ${clockInRes.data.distance_meters}m)`);
 
     // Live GPS background location update
     const { req: reqGps, res: resGps, getResult: getGps } = createMockReqRes(

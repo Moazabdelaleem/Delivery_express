@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { DELIVERY_OUTCOMES, getOutcomeByKey, findOutcome } = require('../config/deliveryOutcomes');
+const { DELIVERY_OUTCOMES, getOutcomeByKey, findOutcome, COLLECTION_FILTER_MAP } = require('../config/deliveryOutcomes');
 const { sendPushNotification } = require('../utils/pushNotifier');
 
 // Sequential status flow rules (server-side enforcement)
@@ -393,8 +393,30 @@ exports.updateDeliveryStatus = async (req, res) => {
       return res.status(403).json({ error: 'This order is not assigned to you.' });
     }
 
-    const deliveryOutcome   = outcomeObj ? outcomeObj.delivery_outcome : (inputDeliveryOutcome || (status === 'delivered' ? 'full' : 'none'));
-    const collectionOutcome = outcomeObj ? outcomeObj.collection_outcome : (inputCollectionOutcome || (status === 'delivered' ? 'cash_full' : 'none'));
+    const deliveryOutcome   = outcomeObj ? outcomeObj.delivery_outcome : inputDeliveryOutcome;
+    const collectionOutcome = outcomeObj ? outcomeObj.collection_outcome : inputCollectionOutcome;
+
+    const validDeliveryOutcomes = ['full', 'partial', 'none', 'shipped_3rd_party', 'not_shipped'];
+    const validCollectionOutcomes = ['cash_full', 'cash_partial', 'transfer_full', 'transfer_partial', 'none', 'shipping_fee_only'];
+
+    if (!deliveryOutcome || !validDeliveryOutcomes.includes(deliveryOutcome)) {
+      return res.status(400).json({
+        error: `delivery_outcome is required and must be one of: ${validDeliveryOutcomes.join(', ')}`
+      });
+    }
+
+    if (!collectionOutcome || !validCollectionOutcomes.includes(collectionOutcome)) {
+      return res.status(400).json({
+        error: `collection_outcome is required and must be one of: ${validCollectionOutcomes.join(', ')}`
+      });
+    }
+
+    const allowedCollections = COLLECTION_FILTER_MAP[deliveryOutcome] || [];
+    if (!allowedCollections.includes(collectionOutcome)) {
+      return res.status(400).json({
+        error: `Invalid collection_outcome '${collectionOutcome}' for delivery_outcome '${deliveryOutcome}'.`
+      });
+    }
 
     const orderTotalAmount = parseFloat(order.order_amount || 0);
     let delAmount = delivered_items_amount !== undefined && delivered_items_amount !== null
@@ -627,7 +649,10 @@ exports.recordPayment = async (req, res) => {
     }
 
     const validMethods = ['cash', 'e_wallet', 'instapay', 'vodafone_cash', 'other'];
-    const pMethod = payment_method && validMethods.includes(payment_method) ? payment_method : 'cash';
+    if (!payment_method || !validMethods.includes(payment_method)) {
+      return res.status(400).json({ error: `payment_method is required and must be one of: ${validMethods.join(', ')}` });
+    }
+    const pMethod = payment_method;
 
     const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [order_id]);
     if (orderRes.rows.length === 0) {
