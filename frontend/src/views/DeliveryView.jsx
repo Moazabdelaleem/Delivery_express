@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getMyDeliveries, updateDeliveryStatus, getWalletSummary, logExpense, updateOnlineStatus, getDriverLedger, recordPayment, getDriverReturnPickups, clockIn, clockOut } from '../api.js';
-import { DELIVERY_OUTCOMES, DELIVERY_OUTCOMES_STEP1, DELIVERY_OUTCOMES_STEP2, COLLECTION_FILTER_MAP, getValidCollectionOutcomes, getOutcomeByKey } from '../deliveryOutcomes.js';
+import { DELIVERY_OUTCOMES, DELIVERY_OUTCOMES_STEP1, DELIVERY_OUTCOMES_STEP2, PAYMENT_METHODS_STEP3, COLLECTION_FILTER_MAP, getValidCollectionOutcomes, getOutcomeByKey } from '../deliveryOutcomes.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import VoiceFeedbackRecorder from '../components/VoiceFeedbackRecorder.jsx';
 import { toast } from '../App.jsx';
@@ -30,8 +30,8 @@ export default function DeliveryView({ token, user }) {
   const [outcomeModal, setOutcomeModal] = useState(null); // order to select status outcome for
   const [outcomeStep, setOutcomeStep]   = useState(1);
   const [step1Outcome, setStep1Outcome] = useState('full');
-  const [step2Outcome, setStep2Outcome] = useState('cash_full');
-  const [outcomeKey, setOutcomeKey]     = useState('full_cash_full');
+  const [step2Outcome, setStep2Outcome] = useState('full');
+  const [step3PaymentMethod, setStep3PaymentMethod] = useState('cash');
   const [delItemAmt, setDelItemAmt]     = useState('');
   const [retItemAmt, setRetItemAmt]     = useState('');
   const [retQty, setRetQty]             = useState('');
@@ -166,10 +166,11 @@ export default function DeliveryView({ token, user }) {
   };
 
   const handleSubmitOutcome = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const payload = {
       delivery_outcome: step1Outcome,
-      collection_outcome: step2Outcome
+      collection_outcome: step2Outcome,
+      payment_method: step2Outcome === 'none' ? 'none' : step3PaymentMethod
     };
 
     if (step1Outcome === 'partial') {
@@ -195,14 +196,6 @@ export default function DeliveryView({ token, user }) {
       setOutcomeModal(null);
       setDelItemAmt(''); setRetItemAmt(''); setRetQty(''); setRetNotes('');
       fetchData();
-
-      // Auto-trigger Record Payment modal if collection_outcome !== 'none'
-      if (step2Outcome !== 'none') {
-        setPaymentModal(targetOrder);
-        setPayAmt(targetOrder.outstanding_balance ? String(targetOrder.outstanding_balance) : String(targetOrder.order_amount));
-        setPayMethod(''); // Explicit selection required (no default guess!)
-        setPaymentAtt(null);
-      }
     } catch (err) {
       toast.error(err.message);
     }
@@ -334,7 +327,7 @@ export default function DeliveryView({ token, user }) {
                 submitting={submitting}
                 onChangeStatus={changeStatus}
                 onFail={(id) => setFailModal(id)}
-                onSelectOutcome={(orderObj) => { setOutcomeModal(orderObj); setOutcomeStep(1); setStep1Outcome('full'); setStep2Outcome('cash_full'); setDelItemAmt(String(orderObj.order_amount)); setRetItemAmt('0'); setRetQty(''); setRetNotes(''); }}
+                onSelectOutcome={(orderObj) => { setOutcomeModal(orderObj); setOutcomeStep(1); setStep1Outcome('full'); setStep2Outcome('full'); setStep3PaymentMethod('cash'); setDelItemAmt(String(orderObj.order_amount)); setRetItemAmt('0'); setRetQty(''); setRetNotes(''); }}
                 onRecordPayment={(orderObj) => { setPaymentModal(orderObj); setPayAmt(orderObj.outstanding_balance ? String(orderObj.outstanding_balance) : String(orderObj.order_amount)); setPayMethod(''); setPaymentAtt(null); }}
               />
             ))}
@@ -370,15 +363,15 @@ export default function DeliveryView({ token, user }) {
         </div>
       )}
 
-      {/* Outcome Status Selector Modal (2-Step Wizard) */}
+      {/* Outcome Status Selector Modal (3-Step Wizard) */}
       {outcomeModal && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 540 }}>
-            {outcomeStep === 1 ? (
+            {outcomeStep === 1 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 1 of 2: How was it delivered? (حالة التسليم)</h2>
-                  <span style={{ background: 'var(--clr-accent)', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>1 / 2</span>
+                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 1 of 3: How was it delivered? (حالة التسليم)</h2>
+                  <span style={{ background: 'var(--clr-accent)', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>1 / 3</span>
                 </div>
                 <p style={{ color: 'var(--clr-text-muted)', fontSize: 13, marginBottom: 14 }}>
                   Order: <strong>#{outcomeModal.tracking_number}</strong> | Address: <strong>{outcomeModal.client_address}</strong>
@@ -480,14 +473,16 @@ export default function DeliveryView({ token, user }) {
 
                 <div className="modal-actions" style={{ marginTop: 16 }}>
                   <button type="button" className="btn btn-ghost" onClick={() => setOutcomeModal(null)}>Cancel</button>
-                  <button type="button" className="btn btn-primary" onClick={() => setOutcomeStep(2)}>Next →</button>
+                  <button type="button" className="btn btn-primary" onClick={() => setOutcomeStep(2)}>Next: Collection Outcome →</button>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleSubmitOutcome}>
+            )}
+
+            {outcomeStep === 2 && (
+              <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 2 of 2: What was collected? (حالة التحصيل)</h2>
-                  <span style={{ background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>2 / 2</span>
+                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 2 of 3: What was collected? (حالة التحصيل)</h2>
+                  <span style={{ background: '#10b981', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>2 / 3</span>
                 </div>
 
                 {/* Step 1 Summary Badge Pill */}
@@ -517,13 +512,68 @@ export default function DeliveryView({ token, user }) {
                             background: isSelected ? 'rgba(16,185,129,0.08)' : 'var(--clr-bg-subtle)',
                             cursor: 'pointer',
                             display: 'flex',
-                            justify: 'space-between',
+                            justifyContent: 'space-between',
                             alignItems: 'center',
                             fontWeight: isSelected ? 700 : 500
                           }}
                         >
                           <span>{item.label_ar} ({item.label_en})</span>
                           {isSelected && <span style={{ color: '#10b981', fontWeight: 'bold' }}>✓</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="modal-actions" style={{ marginTop: 16 }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setOutcomeStep(1)}>← Back</button>
+                  {step2Outcome === 'none' ? (
+                    <button type="button" className="btn btn-primary" onClick={handleSubmitOutcome}>Confirm Outcome</button>
+                  ) : (
+                    <button type="button" className="btn btn-primary" onClick={() => setOutcomeStep(3)}>Next: Payment Method →</button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {outcomeStep === 3 && (
+              <form onSubmit={handleSubmitOutcome}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <h2 className="modal-title" style={{ margin: 0 }}>📋 Step 3 of 3: Payment Method & Details (طريقة الدفع)</h2>
+                  <span style={{ background: '#8b5cf6', color: 'white', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>3 / 3</span>
+                </div>
+
+                {/* Summary Badges */}
+                <div style={{ background: 'rgba(139,92,246,0.08)', padding: '10px 14px', borderRadius: 'var(--r-sm)', border: '1px solid #ddd6fe', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                    <span>Delivery: <strong>{DELIVERY_OUTCOMES_STEP1.find(s => s.value === step1Outcome)?.label_ar}</strong></span>
+                    <span>Collection: <strong>{DELIVERY_OUTCOMES_STEP2.find(s => s.value === step2Outcome)?.label_ar}</strong></span>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Select Payment Method:</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {PAYMENT_METHODS_STEP3.map((item) => {
+                      const isSelected = step3PaymentMethod === item.value;
+                      return (
+                        <div
+                          key={item.value}
+                          onClick={() => setStep3PaymentMethod(item.value)}
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: 'var(--r-sm)',
+                            border: isSelected ? '2px solid #8b5cf6' : '1px solid var(--clr-border)',
+                            background: isSelected ? 'rgba(139,92,246,0.08)' : 'var(--clr-bg-subtle)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontWeight: isSelected ? 700 : 500
+                          }}
+                        >
+                          <span>{item.label_ar} ({item.label_en})</span>
+                          {isSelected && <span style={{ color: '#8b5cf6', fontWeight: 'bold' }}>✓</span>}
                         </div>
                       );
                     })}
@@ -545,8 +595,8 @@ export default function DeliveryView({ token, user }) {
                 />
 
                 <div className="modal-actions" style={{ marginTop: 16 }}>
-                  <button type="button" className="btn btn-ghost" onClick={() => setOutcomeStep(1)}>← Back</button>
-                  <button type="submit" className="btn btn-primary">Confirm Outcome</button>
+                  <button type="button" className="btn btn-ghost" onClick={() => setOutcomeStep(2)}>← Back</button>
+                  <button type="submit" className="btn btn-primary">Submit Final Outcome</button>
                 </div>
               </form>
             )}

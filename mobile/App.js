@@ -4725,6 +4725,7 @@ const parseSafeJson = async (res) => {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', marginBottom: 14 }}>
                   <Text style={[theme.text, { fontSize: 15, fontWeight: '800' }, isRTL && styles.rtlText]}>
+{{ ... }}
                     {dt(selectedDriverLedgerData.driver?.name)} (@{selectedDriverLedgerData.driver?.username})
                   </Text>
 
@@ -4838,7 +4839,7 @@ const parseSafeJson = async (res) => {
         onCancel={() => setShowLocationModal(false)}
       />
 
-      {/* Delivery Outcome Selection Modal (2-Step Wizard Flow) */}
+      {/* Delivery Outcome & Payment Method Selection Modal (3-Step Wizard Flow) */}
       <Modal visible={outcomeModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
@@ -4848,10 +4849,10 @@ const parseSafeJson = async (res) => {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, flex: 1 }, isRTL && styles.rtlText]}>
-                    {lang === 'ar' ? '📋 الخطوة 1 من 2: كيف تم التسليم؟' : '📋 Step 1 of 2: How was it delivered?'}
+                    {lang === 'ar' ? '📋 الخطوة 1 من 3: كيف تم التسليم؟' : '📋 Step 1 of 3: How was it delivered?'}
                   </Text>
                   <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>1/2</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>1/3</Text>
                   </View>
                 </View>
 
@@ -4880,13 +4881,7 @@ const parseSafeJson = async (res) => {
                         alignItems: 'center',
                         justifyContent: 'space-between'
                       }}
-                      onPress={() => {
-                        setStep1Outcome(item.value);
-                        const validStep2 = getValidCollectionOutcomes(item.value);
-                        if (validStep2.length > 0) {
-                          setStep2Outcome(validStep2[0].value);
-                        }
-                      }}
+                      onPress={() => setStep1Outcome(item.value)}
                     >
                       <Text style={{ flex: 1, fontWeight: '800', fontSize: 14, color: isSelected ? '#2563eb' : (isDarkMode ? '#fff' : '#0f172a') }}>
                         {lang === 'ar' ? item.label_ar : item.label_en}
@@ -4958,15 +4953,15 @@ const parseSafeJson = async (res) => {
                   </TouchableOpacity>
                 </View>
               </ScrollView>
-            ) : (
+            ) : outcomeStep === 2 ? (
               /* Step 2 Screen: What was collected? (Filtered Options) */
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, fontSize: 15, flex: 1 }, isRTL && styles.rtlText]}>
-                    {lang === 'ar' ? '📋 الخطوة 2 من 2: ما الذي تم تحصيله؟' : '📋 Step 2 of 2: What was collected?'}
+                    {lang === 'ar' ? '📋 الخطوة 2 من 3: ما المبلغ المحصل؟' : '📋 Step 2 of 3: How much was collected?'}
                   </Text>
                   <View style={{ backgroundColor: '#10b981', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>2/2</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>2/3</Text>
                   </View>
                 </View>
 
@@ -5015,6 +5010,118 @@ const parseSafeJson = async (res) => {
                       </Text>
                       {isSelected && (
                         <View style={{ backgroundColor: '#10b981', borderRadius: 12, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="checkmark" size={14} color="#ffffff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, marginBottom: 16 }}>
+                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(1)}>
+                    <Text style={styles.cancelButtonText}>{lang === 'ar' ? '← رجوع' : '← Back'}</Text>
+                  </TouchableOpacity>
+
+                  {step2Outcome === 'none' ? (
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
+                      disabled={actionLoadingId === 'confirmOutcome'}
+                      onPress={async () => {
+                        if (!selectedOrderForOutcome) return;
+                        setActionLoadingId('confirmOutcome');
+                        try {
+                          const payload = {
+                            delivery_outcome: step1Outcome,
+                            collection_outcome: 'none',
+                            delivered_items_amount: parseFloat(deliveredAmountInput || 0),
+                            returned_items_amount: parseFloat(returnedAmountInput || 0),
+                            returned_quantity: parseInt(returnedQuantityInput || 1, 10),
+                            return_notes: returnNotesInput ? returnNotesInput.trim() : null
+                          };
+
+                          const finalStatus = ['full', 'partial'].includes(step1Outcome) ? 'delivered' : 'delivery_failed';
+                          await updateDeliveryStatus(selectedOrderForOutcome.id, finalStatus, payload.delivered_items_amount, '', payload);
+                          setOutcomeModal(false);
+                          setRecordedAudioNote(null);
+                          setRecordedAudioDuration(0);
+                          showToast(lang === 'ar' ? 'تم تسجيل وتأكيد نتيجة التسليم بدون تحصيل!' : 'Delivery outcome saved with no collection!');
+                        } catch (err) {
+                          Alert.alert(t('alertError'), err.message);
+                        } finally {
+                          setActionLoadingId(null);
+                        }
+                      }}
+                    >
+                      {actionLoadingId === 'confirmOutcome' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'تأكيد وإنهـاء ✓' : 'Confirm & Finish ✓'}</Text>}
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
+                      onPress={() => setOutcomeStep(3)}
+                    >
+                      <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (طريقة الدفع) ←' : 'Next (Payment) →'}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </ScrollView>
+            ) : (
+              /* Step 3 Screen: Payment Method & Driver Notes */
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, fontSize: 15, flex: 1 }, isRTL && styles.rtlText]}>
+                    {lang === 'ar' ? '💳 الخطوة 3 من 3: طريقة الدفع والملاحظات' : '💳 Step 3 of 3: Payment Method & Notes'}
+                  </Text>
+                  <View style={{ backgroundColor: '#8b5cf6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>3/3</Text>
+                  </View>
+                </View>
+
+                {/* Step 1 & Step 2 Summary Badges */}
+                <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f5f3ff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#ddd6fe', marginBottom: 14, gap: 6 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#6d28d9', fontWeight: '700' }}>{lang === 'ar' ? 'التسليم:' : 'Delivery:'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color }}>
+                      {DELIVERY_OUTCOMES_STEP1.find(s => s.value === step1Outcome)?.[lang === 'ar' ? 'label_ar' : 'label_en']}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#6d28d9', fontWeight: '700' }}>{lang === 'ar' ? 'التحصيل:' : 'Collection:'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color }}>
+                      {DELIVERY_OUTCOMES_STEP2.find(s => s.value === step2Outcome)?.[lang === 'ar' ? 'label_ar' : 'label_en']}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginBottom: 8 }, isRTL && styles.rtlText]}>
+                  {lang === 'ar' ? 'اختر طريقة التحصيل والدفع:' : 'Select Payment Method:'}
+                </Text>
+
+                {PAYMENT_METHODS_STEP3.map((method) => {
+                  const isSelected = step3PaymentMethod === method.value;
+                  return (
+                    <TouchableOpacity
+                      key={method.value}
+                      activeOpacity={0.8}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? '#8b5cf6' : (isDarkMode ? '#334155' : '#cbd5e1'),
+                        backgroundColor: isSelected
+                          ? (isDarkMode ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)')
+                          : (isDarkMode ? '#1e293b' : '#f8fafc'),
+                        marginBottom: 8,
+                        flexDirection: isRTL ? 'row-reverse' : 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                      onPress={() => setStep3PaymentMethod(method.value)}
+                    >
+                      <Text style={{ flex: 1, fontWeight: '800', fontSize: 14, color: isSelected ? '#8b5cf6' : (isDarkMode ? '#fff' : '#0f172a') }}>
+                        {lang === 'ar' ? method.label_ar : method.label_en}
+                      </Text>
+                      {isSelected && (
+                        <View style={{ backgroundColor: '#8b5cf6', borderRadius: 12, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons name="checkmark" size={14} color="#ffffff" />
                         </View>
                       )}

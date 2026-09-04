@@ -397,7 +397,7 @@ exports.updateDeliveryStatus = async (req, res) => {
     const collectionOutcome = outcomeObj ? outcomeObj.collection_outcome : inputCollectionOutcome;
 
     const validDeliveryOutcomes = ['full', 'partial', 'none', 'shipped_3rd_party', 'not_shipped'];
-    const validCollectionOutcomes = ['cash_full', 'cash_partial', 'transfer_full', 'transfer_partial', 'none', 'shipping_fee_only'];
+    const validCollectionOutcomes = ['full', 'partial', 'none', 'shipping_fee_only', 'cash_full', 'cash_partial', 'transfer_full', 'transfer_partial'];
 
     if (!deliveryOutcome || !validDeliveryOutcomes.includes(deliveryOutcome)) {
       return res.status(400).json({
@@ -408,13 +408,6 @@ exports.updateDeliveryStatus = async (req, res) => {
     if (!collectionOutcome || !validCollectionOutcomes.includes(collectionOutcome)) {
       return res.status(400).json({
         error: `collection_outcome is required and must be one of: ${validCollectionOutcomes.join(', ')}`
-      });
-    }
-
-    const allowedCollections = COLLECTION_FILTER_MAP[deliveryOutcome] || [];
-    if (!allowedCollections.includes(collectionOutcome)) {
-      return res.status(400).json({
-        error: `Invalid collection_outcome '${collectionOutcome}' for delivery_outcome '${deliveryOutcome}'.`
       });
     }
 
