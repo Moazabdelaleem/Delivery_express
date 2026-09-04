@@ -4725,7 +4725,6 @@ const parseSafeJson = async (res) => {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', marginBottom: 14 }}>
                   <Text style={[theme.text, { fontSize: 15, fontWeight: '800' }, isRTL && styles.rtlText]}>
-{{ ... }}
                     {dt(selectedDriverLedgerData.driver?.name)} (@{selectedDriverLedgerData.driver?.username})
                   </Text>
 
