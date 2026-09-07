@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,7 +12,8 @@ import {
   Alert,
   Image,
   Linking,
-  Platform
+  Platform,
+  AppState
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -1128,15 +1129,28 @@ function MainApp() {
     loadSavedSession();
   }, []);
 
-  // Periodic Auto-Sync Interval for dynamic multi-screen synchronization
+  // Periodic Auto-Sync — pauses when app goes to background (C1 mobile equivalent)
   useEffect(() => {
     if (!token || !user) return;
     registerForPushNotificationsAsync(apiBase, token);
 
+    // Reduced from 4s to 30s — sockets handle real-time, polling is a fallback
     const iv = setInterval(() => {
-      fetchData();
-    }, 4000);
-    return () => clearInterval(iv);
+      if (AppState.currentState === 'active') fetchData();
+    }, 30000);
+
+    // Pause/resume polling based on app foreground state
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        // App came to foreground — fetch immediately
+        fetchData();
+      }
+    });
+
+    return () => {
+      clearInterval(iv);
+      if (appStateSub && appStateSub.remove) appStateSub.remove();
+    };
   }, [token, user]);
 
   useEffect(() => {
@@ -1164,6 +1178,16 @@ function MainApp() {
       timeout: 5000
     });
 
+    // CRITICAL: Join user-specific and role-specific rooms so targeted emits are received
+    socket.on('connect', () => {
+      socket.emit('identify', { id: user.id, role: user.role, token });
+    });
+
+    // Re-identify after reconnection (e.g. network drop)
+    socket.on('reconnect', () => {
+      socket.emit('identify', { id: user.id, role: user.role, token });
+    });
+
     socket.on('order_assigned', (data) => {
       if (user.role === 'delivery_guy' && data.delivery_guy_id === user.id) {
         showToast(lang === 'ar' ? 'تم إسناد شحنة جديدة لك!' : 'New order assigned to you!');
@@ -1176,11 +1200,16 @@ function MainApp() {
     socket.on('pocket_topup', () => fetchData());
     socket.on('wallet_updated', () => fetchData());
     socket.on('online_status_changed', () => fetchData());
+    socket.on('payment_confirmed', () => fetchData());
+    socket.on('payment_rejected', () => fetchData());
+    socket.on('payment_recorded', () => fetchData());
+    socket.on('return_updated', () => fetchData());
 
     return () => {
       socket.disconnect();
     };
-  }, [token, user, serverHost, lang]);
+    // Note: lang intentionally excluded — language change must NOT trigger socket reconnect
+  }, [token, user, serverHost]);
 
   const handleLogin = async (overrideUser, overridePass) => {
     const loginUser = overrideUser || username;
@@ -1296,13 +1325,26 @@ const parseSafeJson = async (res) => {
   const fetchData = async () => {
     if (!token || !user) return;
     try {
-      if (user.role === 'delivery_guy') {
-        const oRes = await fetch(`${apiBase}/orders/my-deliveries`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const oData = await parseSafeJson(oRes);
-        if (Array.isArray(oData)) setOrders(oData);
+      // M5: Auto-logout on expired JWT — universal guard for all roles
+      const _authUrl = user.role === 'delivery_guy'
+        ? apiBase + '/orders/my-deliveries'
+        : apiBase + '/orders/all';
+      const _authRes = await fetch(_authUrl, { headers: { Authorization: 'Bearer ' + token } });
+      if (_authRes.status === 401) {
+        await AsyncStorage.removeItem('delivery_express_session');
+        setToken(null); setUser(null); setOrders([]);
+        Alert.alert(
+          lang === 'ar' ? 'انتهت الجلسة' : 'Session Expired',
+          lang === 'ar' ? 'يرجى تسجيل الدخول مرة أخرى.' : 'Your session has expired. Please sign in again.'
+        );
+        return;
+      }
+      // Use the already-fetched orders response to avoid a duplicate network call
+      const _firstData = await parseSafeJson(_authRes);
+      if (Array.isArray(_firstData)) setOrders(_firstData);
 
+      if (user.role === 'delivery_guy') {
+        // Orders already fetched by 401 guard above (setOrders called)
         const rRes = await fetch(`${apiBase}/returns/my-pickups`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -1333,11 +1375,7 @@ const parseSafeJson = async (res) => {
         }
       } else {
         // Finance, Manager, Supervisor, Inventory
-        const oRes = await fetch(`${apiBase}/orders/all`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const oData = await parseSafeJson(oRes);
-        if (Array.isArray(oData)) setOrders(oData);
+        // Orders already fetched by 401 guard above (setOrders called)
 
         const gRes = await fetch(`${apiBase}/auth/role/delivery_guy`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -1430,6 +1468,12 @@ const parseSafeJson = async (res) => {
         const pRes = await fetch(`${apiBase}/auth/pending-approvals`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        // M5 mobile: 401 = expired JWT, auto-logout
+        if (pRes.status === 401) {
+          await AsyncStorage.removeItem('delivery_express_session');
+          setToken(null); setUser(null); setOrders([]);
+          return;
+        }
         const pData = await pRes.json();
         if (Array.isArray(pData)) setPendingManagers(pData);
       }
