@@ -478,6 +478,8 @@ export default function SupervisorView({ token, user }) {
             </div>
           </div>
         </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteModal && (
         <div className="modal-overlay">
