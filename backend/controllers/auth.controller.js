@@ -102,7 +102,10 @@ exports.login = async (req, res) => {
     }
 
     const cleanUsername = String(username).toLowerCase().trim();
-    const result = await db.query('SELECT * FROM users WHERE LOWER(username) = $1', [cleanUsername]);
+    const result = await db.query(
+      'SELECT id, username, name, role, online_status, phone, is_approved, password_hash, push_token FROM users WHERE LOWER(username) = $1',
+      [cleanUsername]
+    );
 
     if (result.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid username or password.' });
@@ -156,13 +159,11 @@ exports.getPendingUsers = async (req, res) => {
     const result = await db.query(
       `SELECT id, username, name, role, phone, is_approved, created_at
        FROM users
+       WHERE is_approved = false
+         AND username != 'tarek_manager'
        ORDER BY created_at DESC`
     );
-    const pendingList = result.rows.filter(
-      u => u.username !== 'tarek_manager' &&
-           (u.is_approved === false || u.is_approved === 'f' || u.is_approved === 'false' || u.is_approved == 0 || !u.is_approved)
-    );
-    res.json(pendingList);
+    res.json(result.rows);
   } catch (err) {
     console.error('Error fetching pending users:', err);
     res.status(500).json({ error: 'Failed to fetch pending user accounts.' });
@@ -256,7 +257,8 @@ exports.seedDemoAccounts = async (req, res) => {
   try {
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('Admin123!', salt);
+    const demoPassword = process.env.DEMO_PASSWORD || 'Admin123!';
+    const passwordHash = await bcrypt.hash(demoPassword, salt);
 
     const demoUsers = [
       { username: 'sami_delivery', name: 'Sami Delivery', role: 'delivery_guy', email: 'sami@delivery.com', phone: '01012345678' },

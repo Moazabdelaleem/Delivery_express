@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, createOrder, getUsersByRole, createReturn, getShiftSummary } from '../api.js';
+import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
@@ -10,10 +10,14 @@ export default function SupervisorView({ token, user }) {
   const [shiftSummaries, setShiftSummaries] = useState([]);
   const [loading, setLoading]               = useState(true);
   const [showModal, setShowModal]           = useState(false);
+  const [editModal, setEditModal]           = useState(null); // order being edited
   const [submitting, setSub]                = useState(false);
   const [filter, setFilter]                 = useState('all');
   const [detailsModal, setDetailsModal]     = useState(false);
   const [detailsType, setDetailsType]       = useState('');
+
+  const [deleteModal, setDeleteModal]       = useState(null); // { id, tracking_number }
+  const [deleting, setDeleting]             = useState(false);
 
   const [returnModal, setReturnModal]   = useState(null); // order object
   const [retType, setRetType]           = useState('full');
@@ -26,6 +30,10 @@ export default function SupervisorView({ token, user }) {
   const [form, setForm] = useState({
     client_address: '',
     order_details: '', order_amount: '', delivery_guy_id: '', payment_type: 'pay_after_delivery'
+  });
+
+  const [editForm, setEditForm] = useState({
+    tracking_number: '', client_address: '', order_details: '', order_amount: '', delivery_guy_id: '', payment_type: 'pay_after_delivery'
   });
 
   const fetchData = useCallback(async () => {
@@ -79,6 +87,57 @@ export default function SupervisorView({ token, user }) {
       toast.error(err.message);
     } finally {
       setSub(false);
+    }
+  };
+
+  const openEditOrderModal = (o) => {
+    setEditModal(o);
+    setEditForm({
+      tracking_number: o.tracking_number || '',
+      client_address: o.client_address || '',
+      order_details: o.order_details || '',
+      order_amount: o.order_amount ? String(o.order_amount) : '',
+      delivery_guy_id: o.delivery_guy_id || '',
+      payment_type: o.payment_type || 'pay_after_delivery'
+    });
+  };
+
+  const handleUpdateOrder = async (e) => {
+    e.preventDefault();
+    if (!editModal) return;
+    setSub(true);
+    try {
+      const payload = {
+        tracking_number: editForm.tracking_number.trim(),
+        client_address: editForm.client_address.trim(),
+        order_details: editForm.order_details,
+        order_amount: parseFloat(editForm.order_amount) || 0,
+        payment_type: editForm.payment_type,
+        delivery_guy_id: editForm.delivery_guy_id || null
+      };
+      await updateOrder(editModal.id, payload, token);
+      toast.success('Order updated successfully!');
+      setEditModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteModal || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteOrder(deleteModal.id, token);
+      toast.success(`Order #${deleteModal.tracking_number} deleted successfully.`);
+      setDeleteModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -203,6 +262,12 @@ export default function SupervisorView({ token, user }) {
                     </td>
                     <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span></td>
                     <td style={{ fontSize: 11, color: 'var(--clr-text-dim)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-sm btn-ghost" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openEditOrderModal(o)}>✏️ Edit</button>
+                        <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => setDeleteModal(o)}>🗑️</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -216,7 +281,7 @@ export default function SupervisorView({ token, user }) {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 520 }}>
             <h2 className="modal-title">📦 New Delivery Order</h2>
-            <form id="create-order-form" onSubmit={handleCreate}>
+            <form id="create-order-form" onSubmit={handleCreateOrder}>
               <div className="form-group">
                 <label className="form-label">Delivery Address <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
                 <input id="order-address" className="form-input" placeholder="Building, Street, Area" value={form.client_address} onChange={e => setForm(f => ({ ...f, client_address: e.target.value }))} required />
@@ -260,6 +325,61 @@ export default function SupervisorView({ token, user }) {
           </div>
         </div>
       )}
+
+      {/* Edit Order Modal */}
+      {editModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <h2 className="modal-title">✏️ Edit Order #{editModal.tracking_number}</h2>
+            <form id="edit-order-form" onSubmit={handleUpdateOrder}>
+              <div className="form-group">
+                <label className="form-label">Tracking Number / Code <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
+                <input className="form-input" value={editForm.tracking_number} onChange={e => setEditForm(f => ({ ...f, tracking_number: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Delivery Address <span style={{ color: 'var(--clr-danger)' }}>*</span></label>
+                <input className="form-input" placeholder="Building, Street, Area" value={editForm.client_address} onChange={e => setEditForm(f => ({ ...f, client_address: e.target.value }))} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Order Details</label>
+                <input className="form-input" placeholder="e.g. 1x Laptop, 2x Headphones" value={editForm.order_details} onChange={e => setEditForm(f => ({ ...f, order_details: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Amount (EGP)</label>
+                <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00" value={editForm.order_amount} onChange={e => setEditForm(f => ({ ...f, order_amount: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 'bold', color: 'var(--clr-primary)' }}>💳 Payment Type *</label>
+                <select className="form-select" style={{ fontWeight: 'bold' }} value={editForm.payment_type} onChange={e => setEditForm(f => ({ ...f, payment_type: e.target.value }))}>
+                  <option value="pay_after_delivery">Pay After Delivery (كاش بعد التسليم)</option>
+                  <option value="full_upfront">Full Upfront (دفع مقدم كامل)</option>
+                  <option value="accounts_payable">Accounts Payable (آجل / حسابات)</option>
+                  <option value="installments">Installments (تقسيط / أقساط)</option>
+                  <option value="other">Other / Transfer (آخر / تحويل)</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Assign Driver</label>
+                <select className="form-select" value={editForm.delivery_guy_id} onChange={e => setEditForm(f => ({ ...f, delivery_guy_id: e.target.value }))}>
+                  <option value="">— Select driver —</option>
+                  {drivers.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.online_status === 'online' ? '🟢' : '⚫'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setEditModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? <span className="spinner" /> : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* KPI Details Modal */}
       {detailsModal && (
         <div className="modal-overlay">
@@ -283,23 +403,32 @@ export default function SupervisorView({ token, user }) {
                     <tr>
                       <th>Driver Name</th>
                       <th>Username</th>
-                      <th>Phone</th>
                       <th>Status</th>
+                      <th>⏱️ Worked Today (Daily)</th>
+                      <th>📅 Worked This Month (Accumulated)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {drivers.map(d => (
-                      <tr key={d.id}>
-                        <td><strong>{d.name}</strong></td>
-                        <td>@{d.username}</td>
-                        <td>{d.phone || 'N/A'}</td>
-                        <td>
-                          <span className={`badge ${d.online_status === 'online' ? 'badge-delivered' : 'badge-ghost'}`}>
-                            {d.online_status === 'online' ? '🟢 Online' : '⚫ Offline'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {drivers.map(d => {
+                      const sh = shiftSummaries.find(s => String(s.driver_id) === String(d.id));
+                      return (
+                        <tr key={d.id}>
+                          <td><strong>{d.name}</strong></td>
+                          <td>@{d.username}</td>
+                          <td>
+                            <span className={`badge ${d.online_status === 'online' ? 'badge-delivered' : 'badge-ghost'}`}>
+                              {d.online_status === 'online' ? '🟢 Online' : '⚫ Offline'}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>
+                            ⏱️ {sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00'} hrs
+                          </td>
+                          <td style={{ fontWeight: 700, color: 'var(--clr-purple)' }}>
+                            📅 {sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00'} hrs
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               ) : (
@@ -311,6 +440,7 @@ export default function SupervisorView({ token, user }) {
                       <th>Amount</th>
                       <th>Driver</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -333,6 +463,9 @@ export default function SupervisorView({ token, user }) {
                               {STATUS_LABEL[o.status] || o.status}
                             </span>
                           </td>
+                          <td>
+                            <button className="btn btn-sm btn-ghost" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => openEditOrderModal(o)}>✏️ Edit</button>
+                          </td>
                         </tr>
                       ))}
                   </tbody>
@@ -342,6 +475,27 @@ export default function SupervisorView({ token, user }) {
 
             <div className="modal-actions" style={{ marginTop: 20 }}>
               <button className="btn btn-ghost" onClick={() => setDetailsModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      {/* Delete Confirmation Modal */}
+      {deleteModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <h2 className="modal-title" style={{ color: 'var(--clr-danger)' }}>🗑️ Confirm Delete</h2>
+            <p style={{ margin: '16px 0', fontSize: 14 }}>
+              Are you sure you want to delete order <strong>#{deleteModal.tracking_number}</strong>?
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 20 }}>
+              This action will permanently delete status history, expense records, and pending payments associated with this order.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setDeleteModal(null)} disabled={deleting}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-danger" onClick={handleDeleteOrder} disabled={deleting}>
+                {deleting ? <span className="spinner" /> : 'Delete Order'}
+              </button>
             </div>
           </div>
         </div>

@@ -19,6 +19,16 @@ async function resetDemoData() {
     await db.query('DELETE FROM orders;');
     console.log('  ✓ Cleared all orders, payments, returns, attachments, shifts, and audit logs.');
 
+    // 2.5 Delete extra test user accounts (keep only primary 6 demo accounts)
+    await db.query("DELETE FROM collection_wallets WHERE delivery_guy_id IN (SELECT id FROM users WHERE username NOT IN ('sami_delivery', 'kareem_supervisor', 'hassan_inventory', 'mona_finance', 'tarek_manager', 'omar_executive'));");
+    await db.query("DELETE FROM pocket_wallets WHERE delivery_guy_id IN (SELECT id FROM users WHERE username NOT IN ('sami_delivery', 'kareem_supervisor', 'hassan_inventory', 'mona_finance', 'tarek_manager', 'omar_executive'));");
+    const extraDelRes = await db.query(
+      "DELETE FROM users WHERE username NOT IN ('sami_delivery', 'kareem_supervisor', 'hassan_inventory', 'mona_finance', 'tarek_manager', 'omar_executive') RETURNING username;"
+    );
+    if (extraDelRes.rows.length > 0) {
+      console.log(`  ✓ Removed ${extraDelRes.rows.length} extra test account(s): ${extraDelRes.rows.map(u => u.username).join(', ')}`);
+    }
+
     // 3. Reset Collection & Pocket Wallets for all drivers
     await db.query('UPDATE collection_wallets SET current_balance = 0.00, updated_at = NOW();');
     await db.query('UPDATE pocket_wallets SET current_balance = 50.00, total_topped_up = 50.00, total_spent = 0.00, updated_at = NOW();');

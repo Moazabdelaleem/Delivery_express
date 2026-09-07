@@ -1,15 +1,16 @@
 const db = require('../config/db');
 
-let expoInstance = null;
 let ExpoClass = null;
+let expoInstance = null;
 
-async function getExpoInstance() {
-  if (!expoInstance) {
-    const mod = await import('expo-server-sdk');
-    ExpoClass = mod.Expo || mod.default?.Expo || mod.default;
+try {
+  const ExpoModule = require('expo-server-sdk');
+  ExpoClass = ExpoModule.Expo || ExpoModule.default || ExpoModule;
+  if (typeof ExpoClass === 'function') {
     expoInstance = new ExpoClass();
   }
-  return { expo: expoInstance, Expo: ExpoClass };
+} catch (err) {
+  console.warn('⚠️ expo-server-sdk module failed to load:', err.message);
 }
 
 /**
@@ -20,7 +21,7 @@ async function sendPushNotification(userId, title, body, data = {}) {
   if (!userId) return;
 
   try {
-    const { expo, Expo } = await getExpoInstance();
+    if (!expoInstance || !ExpoClass) return;
 
     const userRes = await db.query(
       'SELECT push_token FROM users WHERE id = $1',
@@ -30,7 +31,7 @@ async function sendPushNotification(userId, title, body, data = {}) {
     if (userRes.rows.length === 0) return;
     const pushToken = userRes.rows[0].push_token;
 
-    if (!pushToken || !Expo || !Expo.isExpoPushToken(pushToken)) {
+    if (!pushToken || !ExpoClass || !ExpoClass.isExpoPushToken(pushToken)) {
       // User has not granted notification permission or token is missing/invalid
       return;
     }
@@ -43,9 +44,9 @@ async function sendPushNotification(userId, title, body, data = {}) {
       data: data || {}
     }];
 
-    const chunks = expo.chunkPushNotifications(messages);
+    const chunks = expoInstance.chunkPushNotifications(messages);
     for (const chunk of chunks) {
-      await expo.sendPushNotificationsAsync(chunk);
+      await expoInstance.sendPushNotificationsAsync(chunk);
     }
   } catch (err) {
     console.error(`⚠️ Push notification failed for user ${userId}:`, err.message);

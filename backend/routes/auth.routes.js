@@ -6,20 +6,28 @@ const roleCheck = require('../middleware/roleCheck');
 
 const rateLimit = require('express-rate-limit');
 
-// Rate limiter for Auth routes (100 requests per 15 mins)
+// Strict rate limiter for login/register — prevents brute-force attacks (5 per 15 min)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many login attempts, please wait 15 minutes before trying again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General rate limiter for other auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many attempts, please try again later.' },
+  max: 30,
+  message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 // Public Auth Routes
 router.get('/check-username/:username', authController.checkUsernameAvailability);
-router.post('/register', authLimiter, authController.register);
-router.post('/login', authLimiter, authController.login);
-router.post('/seed', authController.seedDemoAccounts);
+router.post('/register', loginLimiter, authController.register);
+router.post('/login', loginLimiter, authController.login);
 
 // Online Status Toggle (Authenticated)
 router.put('/status', auth, roleCheck(['delivery_guy', 'supervisor', 'inventory', 'finance']), authController.updateOnlineStatus);

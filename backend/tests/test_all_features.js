@@ -129,7 +129,7 @@ async function runAllFeaturesUnitTest() {
     console.log('\n--- 🧪 SCENARIO 5: Attendance, Geofencing & Live GPS ---');
     // Clock-in test
     const { req: reqClockIn, res: resClockIn, getResult: getClockIn } = createMockReqRes(
-      { lat: 30.0444, lng: 31.2357 },
+      { lat: 30.438020, lng: 31.157945 },
       driver
     );
     await clockIn(reqClockIn, resClockIn);

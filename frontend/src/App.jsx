@@ -17,31 +17,86 @@ const ROLE_LABELS = {
 // Toast system
 let _addToast;
 export const toast = {
-  success: (msg) => _addToast?.({ msg, type: 'success' }),
-  error:   (msg) => _addToast?.({ msg, type: 'error' }),
-  info:    (msg) => _addToast?.({ msg, type: 'info' }),
+  success: (msg, title) => _addToast?.({ msg, title: title || 'Success', type: 'success' }),
+  error:   (msg, title) => _addToast?.({ msg, title: title || 'Error', type: 'error' }),
+  info:    (msg, title) => _addToast?.({ msg, title: title || 'Information', type: 'info' }),
+  warning: (msg, title) => _addToast?.({ msg, title: title || 'Warning', type: 'warning' }),
 };
+
+// Global Buffer Loader System
+let _setBufferLoader;
+export const bufferLoader = {
+  show: (msg = 'Processing operation...') => _setBufferLoader?.({ active: true, msg }),
+  hide: () => _setBufferLoader?.({ active: false, msg: '' }),
+};
+
+function GlobalBufferLoader() {
+  const [loader, setLoader] = useState({ active: false, msg: '' });
+
+  useEffect(() => {
+    _setBufferLoader = setLoader;
+    return () => { _setBufferLoader = null; };
+  }, []);
+
+  if (!loader.active) return null;
+
+  return (
+    <div className="buffer-overlay">
+      <div className="buffer-card">
+        <div className="buffer-spinner-container">
+          <div className="buffer-ring-outer" />
+          <div className="buffer-ring-inner" />
+          <div className="buffer-icon-center">🚚</div>
+        </div>
+        <div className="buffer-title">{loader.msg}</div>
+        <div className="buffer-subtitle">
+          Please wait a moment
+          <span className="buffer-dots"><span>.</span><span>.</span><span>.</span></span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
-    _addToast = ({ msg, type }) => {
+    _addToast = ({ msg, title, type }) => {
       const id = Date.now() + Math.random();
-      setToasts(prev => [...prev, { id, msg, type }]);
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+      setToasts(prev => [...prev, { id, msg, title, type }]);
+      const duration = type === 'error' ? 8000 : 4000;
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, duration);
     };
     return () => { _addToast = null; };
   }, []);
 
-  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  const icons = {
+    success: '✓',
+    error: '✕',
+    info: 'ℹ',
+    warning: '⚠',
+  };
 
   return (
     <div className="toast-container">
       {toasts.map(t => (
         <div key={t.id} className={`toast toast-${t.type}`}>
-          <span>{icons[t.type]}</span>
-          <span>{t.msg}</span>
+          <div className="toast-icon-badge">
+            {icons[t.type]}
+          </div>
+          <div className="toast-content">
+            <div className="toast-title">{t.title}</div>
+            <div className="toast-message">{t.msg}</div>
+          </div>
+          <button className="toast-close-btn" onClick={() => removeToast(t.id)}>✕</button>
+          <div className="toast-progress-bar" />
         </div>
       ))}
     </div>
@@ -104,6 +159,7 @@ export default function App() {
     return (
       <>
         <LoginView onLogin={handleLogin} />
+        <GlobalBufferLoader />
         <ToastContainer />
       </>
     );
@@ -120,6 +176,7 @@ export default function App() {
           : <div className="empty-state"><p>Unknown role: {auth.user.role}</p></div>
         }
       </main>
+      <GlobalBufferLoader />
       <ToastContainer />
     </div>
   );

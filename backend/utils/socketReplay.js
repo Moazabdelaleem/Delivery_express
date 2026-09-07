@@ -64,8 +64,22 @@ function extractUserId(socket) {
   return rawId ? String(rawId) : null;
 }
 
+// Periodic cleanup interval: Purge expired entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, events] of pendingUserEventsMap.entries()) {
+    const validEvents = events.filter(e => now - e.timestamp < MAX_BUFFER_AGE_MS);
+    if (validEvents.length === 0) {
+      pendingUserEventsMap.delete(userId);
+    } else {
+      pendingUserEventsMap.set(userId, validEvents);
+    }
+  }
+}, 10 * 60 * 1000);
+
 module.exports = {
   bufferEvent,
   replayPendingEvents,
   extractUserId
 };
+

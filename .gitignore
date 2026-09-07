@@ -4,3 +4,6 @@ node_modules/
 .DS_Store
 dist/
 .expo/
+backend/scratch/
+backend/public/uploads/
+

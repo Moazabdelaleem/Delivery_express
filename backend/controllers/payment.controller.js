@@ -157,32 +157,47 @@ exports.confirmPayment = async (req, res) => {
 
 // Reject a payment (Finance only)
 exports.rejectPayment = async (req, res) => {
+  let client;
   try {
     const { payment_id } = req.params;
 
-    const paymentRes = await db.query(
-      'SELECT * FROM order_payments WHERE id = $1',
+    client = await db.getClient();
+    await client.query('BEGIN');
+
+    // Lock row to prevent concurrent confirm + reject race condition
+    const paymentRes = await client.query(
+      `SELECT p.*, o.tracking_number
+       FROM order_payments p
+       JOIN orders o ON p.order_id = o.id
+       WHERE p.id = $1 FOR UPDATE`,
       [payment_id]
     );
 
     if (paymentRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      client.release();
       return res.status(404).json({ error: 'Payment record not found.' });
     }
 
     const payment = paymentRes.rows[0];
 
     if (payment.confirmation_status !== 'pending_finance_review') {
+      await client.query('ROLLBACK');
+      client.release();
       return res.status(400).json({
         error: `Payment is already processed with status '${payment.confirmation_status}'.`
       });
     }
 
-    const updateRes = await db.query(
+    const updateRes = await client.query(
       `UPDATE order_payments
        SET confirmation_status = 'rejected', confirmed_by = $1, confirmed_at = NOW()
        WHERE id = $2 RETURNING *`,
       [req.user.id, payment_id]
     );
+
+    await client.query('COMMIT');
+    client.release();
 
     const io = req.app.get('io');
     const bufferEvent = req.app.get('bufferEvent');
@@ -209,6 +224,10 @@ exports.rejectPayment = async (req, res) => {
       payment: updateRes.rows[0]
     });
   } catch (err) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      client.release();
+    }
     console.error('Error rejecting payment:', err);
     res.status(500).json({ error: err.message || 'Server error rejecting payment.' });
   }

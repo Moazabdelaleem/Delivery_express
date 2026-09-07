@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const path = require('path');
+const helmet = require('helmet');
 const { Server } = require('socket.io');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
@@ -45,10 +46,22 @@ if (process.env.VERCEL !== '1') {
 
   io.on('connection', (socket) => {
     const userId = extractUserId(socket);
+    // Also extract role from JWT to place socket in a role-specific room
+    let userRole = null;
+    try {
+      const token = socket.handshake?.auth?.token || socket.handshake?.query?.token;
+      if (token) {
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        userRole = decoded?.role || null;
+      }
+    } catch (_) {}
+
     if (userId) {
       socket.userId = userId;
       socket.join(`user_${userId}`);
-      console.log(`⚡ Socket client connected: ${socket.id} (User ID: ${userId})`);
+      if (userRole) socket.join(`role_${userRole}`);
+      console.log(`⚡ Socket client connected: ${socket.id} (User ID: ${userId}, Role: ${userRole || 'unknown'})`);
       replayPendingEvents(socket, userId);
     } else {
       console.log('⚡ Socket client connected:', socket.id, '(Unauthenticated)');
@@ -56,10 +69,19 @@ if (process.env.VERCEL !== '1') {
 
     socket.on('identify', (data) => {
       const id = data?.userId || data?.user_id || extractUserId({ handshake: { auth: { token: data?.token } } });
+      let role = data?.role;
+      if (!role && data?.token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
+          role = decoded?.role;
+        } catch (_) {}
+      }
       if (id) {
         socket.userId = id;
         socket.join(`user_${id}`);
-        console.log(`🔑 Socket client identified: ${socket.id} (User ID: ${id})`);
+        if (role) socket.join(`role_${role}`);
+        console.log(`🔑 Socket client identified: ${socket.id} (User ID: ${id}, Role: ${role || 'unknown'})`);
         replayPendingEvents(socket, id);
       }
     });
@@ -80,7 +102,8 @@ if (process.env.VERCEL !== '1') {
               lat: data.lat,
               lng: data.lng
             });
-            io.emit('driver_location_updated', data);
+            // Only broadcast GPS to supervisors and managers — not all connected users
+            io.to('role_supervisor').to('role_manager').emit('driver_location_updated', data);
           } else {
             console.warn(`⚠️ Rejected socket location update for driver ${driverId}: No active shift`);
           }
@@ -104,7 +127,8 @@ if (process.env.VERCEL !== '1') {
       if (now - info.last_seen_at > TWO_MINUTES_MS && !info.disconnected_alert_sent) {
         info.disconnected_alert_sent = true;
         console.warn(`⚠️ GPS signal lost for active driver '${info.driver_name}' (ID: ${driverId}) for > 2 minutes.`);
-        io.emit('gps_disconnected', {
+        // Only notify supervisors and managers, not all users
+        io.to('role_supervisor').to('role_manager').emit('gps_disconnected', {
           delivery_guy_id: driverId,
           driver_name: info.driver_name,
           last_seen_at: new Date(info.last_seen_at).toISOString(),
@@ -120,8 +144,10 @@ if (process.env.VERCEL !== '1') {
 
 // Middleware
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Security headers (helmet) — disable contentSecurityPolicy for API-only backend
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 const authController = require('./controllers/auth.controller');
@@ -139,11 +165,10 @@ const auth = require('./middleware/auth');
 // Push Token Storage (POST /api/users/push-token)
 app.post('/api/users/push-token', auth, authController.savePushToken);
 
-// Seed Demo Accounts (POST /api/seed)
-app.post('/api/seed', authController.seedDemoAccounts);
-
-// Auto-seed demo accounts on startup in non-production environments
+// Seed Demo Accounts (POST /api/seed) — only available in non-production environments
 if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/seed', authController.seedDemoAccounts);
+  // Auto-seed demo accounts on startup
   authController.seedDemoAccounts().catch(err => console.error('Auto-seed error:', err));
 }
 

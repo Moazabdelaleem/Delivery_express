@@ -4,8 +4,8 @@ const walletController = require('../controllers/wallet.controller');
 const authMiddleware = require('../middleware/auth');
 const roleCheck = require('../middleware/roleCheck');
 
-// Get wallet summary
-router.get('/summary', authMiddleware, walletController.getWalletsSummary);
+// Get wallet summary (delivery_guy sees own, finance/supervisor/manager see all)
+router.get('/summary', authMiddleware, roleCheck(['delivery_guy', 'supervisor', 'inventory', 'finance', 'manager']), walletController.getWalletsSummary);
 
 // Finance pull cash out of Collection Wallet (Bulk or Per-Order)
 router.post('/collection/pullout', authMiddleware, roleCheck(['finance']), walletController.financePullCashOut);

@@ -16,6 +16,21 @@ const handle = async (res) => {
   return data;
 };
 
+const apiFetch = (url, options = {}, timeoutMs = 15000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return window.fetch(url, { ...options, signal: controller.signal })
+    .catch((err) => {
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your network connection.');
+      }
+      throw err;
+    })
+    .finally(() => clearTimeout(timer));
+};
+
+const fetch = apiFetch;
+
 // ---- Auth ----
 export const login = (username, password) =>
   fetch(`${BASE_URL}/auth/login`, {
@@ -74,6 +89,17 @@ export const createOrder = (payload, token) =>
   fetch(`${BASE_URL}/orders`, {
     method: 'POST', headers: headers(token),
     body: JSON.stringify(payload)
+  }).then(handle);
+
+export const updateOrder = (orderId, payload, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}`, {
+    method: 'PUT', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const deleteOrder = (orderId, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}`, {
+    method: 'DELETE', headers: headers(token)
   }).then(handle);
 
 export const updateDeliveryStatus = (orderId, payload, token) =>

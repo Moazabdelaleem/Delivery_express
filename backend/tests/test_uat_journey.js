@@ -330,7 +330,7 @@ async function runUATJourney() {
     console.log('🎉 ALL UAT TEST PHASES & STEPS COMPLETED 100% SUCCESSFULLY!');
     console.log('======================================================================\n');
   } catch (err) {
-    console.error('\n❌ UAT TEST JOURNEY FAILED:', err.message);
+    console.error('\n❌ UAT TEST JOURNEY FAILED:', err.stack || err.message);
     process.exit(1);
   }
 }

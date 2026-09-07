@@ -217,7 +217,11 @@ export default function DeliveryView({ token, user }) {
 
   const handleFail = async (e) => {
     e.preventDefault();
-    await changeStatus(failModal, 'delivery_failed', { failure_reason: failReason });
+    await changeStatus(failModal, 'delivery_failed', {
+      failure_reason: failReason,
+      delivery_outcome: 'none',
+      collection_outcome: 'none',
+    });
     setFailModal(null); setFailReason('');
   };
 
@@ -827,16 +831,20 @@ function OrderCard({ order: o, submitting, onChangeStatus, onFail, onSelectOutco
       </div>
 
       <div className="row-actions">
-        <button className="btn btn-primary btn-sm" onClick={() => onSelectOutcome(o)}>
-          📋 Outcome Status
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={() => onRecordPayment(o)}>
-          💳 Payment
-        </button>
-        {o.status === 'handed_to_delivery' && (
+        {['in_transit', 'handed_to_delivery'].includes(o.status) && (
+          <button className="btn btn-primary btn-sm" style={{ background: 'var(--clr-success)', borderColor: 'var(--clr-success)', fontWeight: 700 }} onClick={() => onSelectOutcome(o)}>
+            📋 Complete Delivery & Payment
+          </button>
+        )}
+        {['handed_to_delivery'].includes(o.status) && (
           <button className="btn btn-primary btn-sm" disabled={isLoading('in_transit')} onClick={() => onChangeStatus(o.id, 'in_transit')}>
             {isLoading('in_transit') ? <span className="spinner" /> : '🚚 Start Transit'}
           </button>
+        )}
+        {['assigned', 'notified_inventory', 'created'].includes(o.status) && (
+          <span style={{ fontSize: 12, color: 'var(--clr-warning)', background: 'var(--clr-bg-subtle)', padding: '6px 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--clr-border)', fontWeight: 600 }}>
+            ⏳ Awaiting Warehouse Handoff
+          </span>
         )}
         {o.status === 'delivery_failed' && (
           <button className="btn btn-warning btn-sm" disabled={isLoading('returned_to_company')} onClick={() => onChangeStatus(o.id, 'returned_to_company')}>

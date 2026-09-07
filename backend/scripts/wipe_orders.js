@@ -10,13 +10,15 @@ async function wipeAllOrders() {
     await db.query('DELETE FROM returns;');
     await db.query('DELETE FROM order_attachments;');
     await db.query('DELETE FROM order_feedback;');
+    await db.query('DELETE FROM wallet_transactions;');
+    await db.query('DELETE FROM order_status_history;');
     await db.query('UPDATE pocket_expenses SET order_id = NULL;');
     await db.query('DELETE FROM pocket_expenses;');
     await db.query('DELETE FROM orders;');
-    await db.query('UPDATE collection_wallets SET current_balance = 0;');
-    await db.query('UPDATE pocket_wallets SET current_balance = 0;');
+    await db.query('UPDATE collection_wallets SET current_balance = 0.00;');
+    await db.query('UPDATE pocket_wallets SET current_balance = 0.00, total_topped_up = 0.00, total_spent = 0.00;');
     await db.query('COMMIT;');
-    console.log('✅ ALL ORDERS, PAYMENTS, RETURNS, ATTACHMENTS, AND WALLETS WIPED CLEANLY!');
+    console.log('✅ ALL ORDERS, PAYMENTS, RETURNS, ATTACHMENTS, AUDIT LOGS, AND WALLETS WIPED CLEANLY!');
   } catch (err) {
     await db.query('ROLLBACK;');
     console.error('🔥 Error wiping order data:', err.message);

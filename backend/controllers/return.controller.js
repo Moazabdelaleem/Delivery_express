@@ -82,12 +82,25 @@ exports.verifyReturn = async (req, res) => {
       return res.status(400).json({ error: "Verification status must be 'verified' or 'rejected'." });
     }
 
-    const returnRes = await db.query('SELECT * FROM returns WHERE id = $1', [return_id]);
+    const returnRes = await db.query(
+      `SELECT r.*, o.status as current_order_status
+       FROM returns r
+       JOIN orders o ON r.order_id = o.id
+       WHERE r.id = $1`,
+      [return_id]
+    );
     if (returnRes.rows.length === 0) {
       return res.status(404).json({ error: 'Return record not found.' });
     }
 
     const returnRec = returnRes.rows[0];
+
+    // Guard: prevent re-verification of already-processed returns
+    if (!['pending_pickup', 'pending_verification'].includes(returnRec.status)) {
+      return res.status(400).json({
+        error: `Return is already '${returnRec.status}' and cannot be re-verified.`
+      });
+    }
 
     const updateRes = await db.query(
       `UPDATE returns
@@ -112,14 +125,16 @@ exports.verifyReturn = async (req, res) => {
 
       await db.query(
         `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
-         VALUES ($1, 'delivery_failed', 'returned_to_company', $2, $3)`,
-        [returnRec.order_id, req.user.id, `Inventory verified return (${returnRec.return_type}): ${notes || 'Return physically verified in warehouse'}`]
+         VALUES ($1, $2, 'returned_to_company', $3, $4)`,
+        [returnRec.order_id, returnRec.current_order_status || 'delivery_failed', req.user.id,
+         `Inventory verified return (${returnRec.return_type}): ${notes || 'Return physically verified in warehouse'}`]
       );
     } else if (status === 'rejected') {
       await db.query(
         `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
-         VALUES ($1, 'in_transit', 'in_transit', $2, $3)`,
-        [returnRec.order_id, req.user.id, `Inventory rejected return verification: ${notes || 'Return rejected'}`]
+         VALUES ($1, $2, $2, $3, $4)`,
+        [returnRec.order_id, returnRec.current_order_status || 'delivery_failed', req.user.id,
+         `Inventory rejected return verification: ${notes || 'Return rejected'}`]
       );
     }
 

@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
   StatusBar,
   Alert,
-  Image
+  Image,
+  Linking,
+  Platform
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +24,7 @@ import * as Device from 'expo-device';
 import LocationPermissionModal from './components/LocationPermissionModal';
 import PhotoCapture from './components/PhotoCapture';
 import VoiceNoteRecorder from './components/VoiceNoteRecorder';
-import { DELIVERY_OUTCOMES, DELIVERY_OUTCOMES_STEP1, DELIVERY_OUTCOMES_STEP2, COLLECTION_FILTER_MAP, getValidCollectionOutcomes, getOutcomeByKey } from './deliveryOutcomes';
+import { DELIVERY_OUTCOMES, DELIVERY_OUTCOMES_STEP1, DELIVERY_OUTCOMES_STEP2, PAYMENT_METHODS_STEP3, COLLECTION_FILTER_MAP, getValidCollectionOutcomes, getOutcomeByKey } from './deliveryOutcomes';
 import { tStatusLabel } from './constants/statusLabels';
 
 try {
@@ -529,6 +531,78 @@ const translations = {
   }
 };
 
+export function getStageTitle(stage, lang = 'ar') {
+  switch (stage) {
+    case 'delivery_completion':
+      return lang === 'ar' ? '📦 إثبات تسليم الشحنة' : '📦 Delivery Package Proof';
+    case 'payment_confirmation':
+      return lang === 'ar' ? '💳 إثبات تحصيل / تحويل الدفعة' : '💳 Payment Transfer Proof';
+    case 'return_verification':
+      return lang === 'ar' ? '🔄 إثبات مرتجعات الشحنة' : '🔄 Partial Return Proof';
+    case 'inventory_handoff':
+      return lang === 'ar' ? '🏭 إثبات تسليم / استلام المخزن' : '🏭 Warehouse Handoff Proof';
+    default:
+      return lang === 'ar' ? '📷 صورة إثبات مرفقة' : '📷 Attached Photo Proof';
+  }
+}
+
+export function parseAddress(addressInput) {
+  if (!addressInput) {
+    return {
+      formattedAddress: '',
+      googleMapsQuery: '',
+      components: { district: '', street: '', building: '', floor_apt: '', landmark: '' }
+    };
+  }
+
+  let obj = null;
+  if (typeof addressInput === 'object') {
+    obj = addressInput;
+  } else if (typeof addressInput === 'string' && addressInput.trim().startsWith('{')) {
+    try {
+      obj = JSON.parse(addressInput);
+    } catch (_) {}
+  }
+
+  if (obj) {
+    const district  = (obj.district || obj.city || obj.area || '').trim();
+    const street    = (obj.street || obj.street_name || obj.address || obj.full_address || '').trim();
+    const building  = (obj.building || obj.building_no || obj.bldg || '').trim();
+    const floorApt  = (obj.floor_apt || obj.floor || obj.apt || '').trim();
+    const landmark  = (obj.landmark || obj.notes || '').trim();
+
+    const parts = [];
+    if (district) parts.push(district);
+    if (street) parts.push(street);
+    if (building) parts.push(building);
+    if (floorApt) parts.push(floorApt);
+    if (landmark) parts.push(`(${landmark})`);
+
+    const rawInputStr = (typeof addressInput === 'string' ? addressInput.trim() : '');
+    const formattedAddress = parts.length > 0 ? parts.join(' - ') : (obj.address || obj.full_address || obj.client_address || rawInputStr);
+
+    const mapParts = [];
+    if (street) mapParts.push(street);
+    if (building) mapParts.push(building);
+    if (district) mapParts.push(district);
+
+    const googleMapsQuery = mapParts.length > 0 ? mapParts.join(', ') : formattedAddress;
+
+    return {
+      formattedAddress: formattedAddress || rawInputStr,
+      googleMapsQuery,
+      components: { district, street, building, floor_apt: floorApt, landmark }
+    };
+  }
+
+  const str = String(addressInput).trim();
+  return {
+    formattedAddress: str,
+    googleMapsQuery: str,
+    components: { district: str, street: '', building: '', floor_apt: '', landmark: '' }
+  };
+}
+
 const LanguageContext = createContext();
 
 function LanguageProvider({ children }) {
@@ -547,8 +621,13 @@ function LanguageProvider({ children }) {
 
   const dt = (text) => {
     if (!text) return '';
-    if (lang === 'en') return text;
-    let result = String(text).trim();
+    let strVal = text;
+    if (typeof text === 'object' || (typeof text === 'string' && text.trim().startsWith('{'))) {
+      const parsed = parseAddress(text);
+      strVal = parsed.formattedAddress || JSON.stringify(text);
+    }
+    let result = String(strVal).trim();
+    if (lang === 'en') return result;
     for (const key of Object.keys(dynamicDictionary)) {
       if (result.toLowerCase().includes(key.toLowerCase())) {
         const reg = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
@@ -645,6 +724,9 @@ function MainApp() {
   const [pendingManagers, setPendingManagers] = useState([]);
   const [notification, setNotification] = useState(null);
   const [driverOnline, setDriverOnline] = useState(false);
+  const [workedHoursToday, setWorkedHoursToday] = useState('0.00');
+  const [workedHoursMonth, setWorkedHoursMonth] = useState('0.00');
+  const [shiftSummaries, setShiftSummaries] = useState([]);
 
   // Feature States
   const [liveGpsEnabled, setLiveGpsEnabled] = useState(true);
@@ -661,6 +743,7 @@ function MainApp() {
   const [selectedOutcomeKey, setSelectedOutcomeKey] = useState('full_cash_full');
   const [step1Outcome, setStep1Outcome] = useState('full');
   const [step2Outcome, setStep2Outcome] = useState('cash_full');
+  const [step3PaymentMethod, setStep3PaymentMethod] = useState('cash');
   const [deliveredAmountInput, setDeliveredAmountInput] = useState('');
   const [returnedAmountInput, setReturnedAmountInput] = useState('');
   const [returnedQuantityInput, setReturnedQuantityInput] = useState('1');
@@ -747,6 +830,16 @@ function MainApp() {
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [orderNumber, setOrderNumber] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [addressDistrict, setAddressDistrict] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressBuilding, setAddressBuilding] = useState('');
+  const [addressFloorApt, setAddressFloorApt] = useState('');
+  const [addressLandmark, setAddressLandmark] = useState('');
+  const [selectedLat, setSelectedLat] = useState(null);
+  const [selectedLng, setSelectedLng] = useState(null);
+  const [pinPickerModal, setPinPickerModal] = useState(false);
+  const [tempLatInput, setTempLatInput] = useState('30.0444');
+  const [tempLngInput, setTempLngInput] = useState('31.2357');
   const [orderAmount, setOrderAmount] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
 
@@ -963,9 +1056,54 @@ function MainApp() {
 
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  const showToast = (msg) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 4000);
+  const [bufferLoadingMsg, setBufferLoadingMsg] = useState(null);
+
+  const startBuffer = (msg) => {
+    setBufferLoadingMsg(msg || (lang === 'ar' ? 'جاري تنفيذ الطلب...' : 'Processing request...'));
+  };
+
+  const stopBuffer = () => {
+    setBufferLoadingMsg(null);
+  };
+
+  const showToast = (msg, type = null, customTitle = null) => {
+    if (!msg) return;
+    let toastType = type;
+    if (!toastType) {
+      const lower = String(msg).toLowerCase();
+      if (lower.includes('fail') || lower.includes('error') || lower.includes('فشل') || lower.includes('خطأ') || lower.includes('❌') || lower.includes('تعذر')) {
+        toastType = 'error';
+      } else if (lower.includes('warn') || lower.includes('تنبيه') || lower.includes('⚠️')) {
+        toastType = 'warning';
+      } else if (lower.includes('info') || lower.includes('معلومات') || lower.includes('ℹ️')) {
+        toastType = 'info';
+      } else {
+        toastType = 'success';
+      }
+    }
+
+    let defaultTitle = customTitle;
+    if (!defaultTitle) {
+      if (toastType === 'success') defaultTitle = lang === 'ar' ? 'تم الإجراء بنجاح ✅' : 'Operation Successful ✅';
+      else if (toastType === 'error') defaultTitle = lang === 'ar' ? 'تنبيه / خطأ ❌' : 'Action Failed ❌';
+      else if (toastType === 'warning') defaultTitle = lang === 'ar' ? 'تحذير ⚠️' : 'Warning ⚠️';
+      else defaultTitle = lang === 'ar' ? 'معلومات ℹ️' : 'Information ℹ️';
+    }
+
+    const cleanMsg = String(msg).replace(/^[\u1F600-\u1F64F\u2700-\u27BF\u2600-\u26FF\u2E00-\u2E7F\u{1F300}-\u{1F9FF}\s✅❌⚠️ℹ️🟢🔴↩️]+/gu, '').trim() || String(msg);
+
+    const payload = {
+      id: Date.now() + Math.random(),
+      msg: cleanMsg,
+      rawMsg: msg,
+      type: toastType,
+      title: defaultTitle,
+    };
+
+    setNotification(payload);
+    setTimeout(() => {
+      setNotification(prev => (prev?.id === payload.id ? null : prev));
+    }, 4500);
   };
 
   useEffect(() => {
@@ -1240,6 +1378,23 @@ const parseSafeJson = async (res) => {
           }
         }
 
+        try {
+          const shUrl = user.role === 'delivery_guy' ? `${apiBase}/shifts/summary/${user.id}` : `${apiBase}/shifts/summary`;
+          const shRes = await fetch(shUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const shData = await parseSafeJson(shRes);
+          if (shRes.ok && shData && shData.summaries) {
+            setShiftSummaries(shData.summaries);
+            if (user.role === 'delivery_guy' && shData.summaries.length > 0) {
+              setWorkedHoursToday(shData.summaries[0].daily_hours || shData.summaries[0].total_hours_today || '0.00');
+              setWorkedHoursMonth(shData.summaries[0].monthly_hours || shData.summaries[0].total_hours_month || '0.00');
+            }
+          }
+        } catch (eShift) {
+          console.log('Shift summary fetch error:', eShift);
+        }
+
         const wRes = await fetch(`${apiBase}/wallets/summary`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -1409,7 +1564,13 @@ const parseSafeJson = async (res) => {
       Alert.alert(t('alertError'), t('mandatoryReasonLabel'));
       return;
     }
-    updateDeliveryStatus(selectedOrderId, 'delivery_failed', 0, failureReason.trim());
+    updateDeliveryStatus(
+      selectedOrderId,
+      'delivery_failed',
+      0,
+      failureReason.trim(),
+      { delivery_outcome: 'none', collection_outcome: 'none', failure_reason: failureReason.trim() }
+    );
     setFailureModal(false);
     setSelectedOrderId(null);
     setFailureReason('');
@@ -1733,7 +1894,25 @@ const parseSafeJson = async (res) => {
   const openEditOrderModal = (order) => {
     setEditingOrderId(order.id);
     setOrderNumber(order.tracking_number || '');
-    setClientAddress(order.client_address || '');
+    setPaymentTypeInput(order.payment_type || 'pay_after_delivery');
+    const parsed = parseAddress(order.client_address);
+    if (parsed.components.street || parsed.components.district) {
+      setAddressDistrict(parsed.components.district);
+      setAddressStreet(parsed.components.street);
+      setAddressBuilding(parsed.components.building);
+      setAddressFloorApt(parsed.components.floor_apt);
+      setAddressLandmark(parsed.components.landmark);
+      setClientAddress('');
+    } else {
+      setClientAddress(order.client_address || '');
+      setAddressDistrict('');
+      setAddressStreet('');
+      setAddressBuilding('');
+      setAddressFloorApt('');
+      setAddressLandmark('');
+    }
+    setSelectedLat(order.latitude ? parseFloat(order.latitude) : null);
+    setSelectedLng(order.longitude ? parseFloat(order.longitude) : null);
     setOrderAmount(order.order_amount ? String(order.order_amount) : '');
     setAssigneeId(order.delivery_guy_id || '');
     setCreateOrderModal(true);
@@ -1747,8 +1926,33 @@ const parseSafeJson = async (res) => {
       );
       return;
     }
-    if (!clientAddress.trim() || !orderAmount) {
-      Alert.alert(t('alertError'), t('addressRequiredMsg'));
+
+    let finalAddress = clientAddress.trim();
+    if (addressDistrict.trim() || addressStreet.trim()) {
+      finalAddress = JSON.stringify({
+        district: addressDistrict.trim(),
+        street: addressStreet.trim(),
+        building: addressBuilding.trim(),
+        floor_apt: addressFloorApt.trim(),
+        landmark: addressLandmark.trim()
+      });
+    }
+
+    const hasTextAddr = Boolean(finalAddress && finalAddress.length > 0);
+    const hasPinLoc  = Boolean(selectedLat !== null && selectedLng !== null && !isNaN(selectedLat) && !isNaN(selectedLng));
+
+    if (!hasTextAddr && !hasPinLoc) {
+      Alert.alert(
+        t('alertError'),
+        lang === 'ar'
+          ? 'يرجى كتابة عنوان التوصيل أو تحديد دبوس الموقع على الخريطة (أحدهما على الأقل مطلوب)!'
+          : 'Either a delivery address or a map pin location is required!'
+      );
+      return;
+    }
+
+    if (!orderAmount) {
+      Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى أدخال مبلغ الشحنة!' : 'Please enter order amount!');
       return;
     }
     if (!assigneeId) {
@@ -1758,6 +1962,7 @@ const parseSafeJson = async (res) => {
       );
       return;
     }
+
     setActionLoadingId('createOrder');
     try {
       const isEditing = Boolean(editingOrderId);
@@ -1772,12 +1977,15 @@ const parseSafeJson = async (res) => {
         },
         body: JSON.stringify({
           tracking_number: orderNumber.trim() || undefined,
-          client_address: clientAddress.trim(),
+          client_address: finalAddress || undefined,
+          latitude: hasPinLoc ? selectedLat : undefined,
+          longitude: hasPinLoc ? selectedLng : undefined,
           order_amount: parseFloat(orderAmount) || 0.00,
           payment_type: paymentTypeInput,
           delivery_guy_id: assigneeId
         })
       });
+
       if (res.ok) {
         showToast(isEditing
           ? (lang === 'ar' ? 'تم تحديث بيانات الشحنة بنجاح!' : 'Order updated successfully!')
@@ -1787,6 +1995,13 @@ const parseSafeJson = async (res) => {
         setEditingOrderId(null);
         setOrderNumber('');
         setClientAddress('');
+        setAddressDistrict('');
+        setAddressStreet('');
+        setAddressBuilding('');
+        setAddressFloorApt('');
+        setAddressLandmark('');
+        setSelectedLat(null);
+        setSelectedLng(null);
         setOrderAmount('');
         setAssigneeId('');
         fetchData();
@@ -2372,8 +2587,42 @@ const parseSafeJson = async (res) => {
       </View>
 
       {notification ? (
-        <View style={styles.toastBanner}>
-          <Text style={styles.toastText}>{notification}</Text>
+        <View style={[
+          styles.enhancedToastBanner,
+          notification.type === 'error' && styles.toastError,
+          notification.type === 'warning' && styles.toastWarning,
+          notification.type === 'info' && styles.toastInfo,
+          notification.type === 'success' && styles.toastSuccess,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' }
+        ]}>
+          <View style={[
+            styles.toastIconCircle,
+            notification.type === 'error' && { backgroundColor: 'rgba(239, 68, 68, 0.25)' },
+            notification.type === 'warning' && { backgroundColor: 'rgba(245, 158, 11, 0.25)' },
+            notification.type === 'info' && { backgroundColor: 'rgba(59, 130, 246, 0.25)' },
+            notification.type === 'success' && { backgroundColor: 'rgba(16, 185, 129, 0.25)' },
+          ]}>
+            <Ionicons
+              name={
+                notification.type === 'error' ? 'close-circle-sharp' :
+                notification.type === 'warning' ? 'warning-sharp' :
+                notification.type === 'info' ? 'information-circle-sharp' : 'checkmark-circle-sharp'
+              }
+              size={22}
+              color={
+                notification.type === 'error' ? '#ef4444' :
+                notification.type === 'warning' ? '#f59e0b' :
+                notification.type === 'info' ? '#3b82f6' : '#10b981'
+              }
+            />
+          </View>
+          <View style={{ flex: 1, paddingHorizontal: 10, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+            <Text style={[styles.toastBannerTitle, isRTL && styles.rtlText]}>{notification.title}</Text>
+            <Text style={[styles.toastBannerMsg, isRTL && styles.rtlText]}>{notification.msg || notification.rawMsg}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setNotification(null)} style={{ padding: 4 }}>
+            <Ionicons name="close" size={18} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
       ) : null}
 
@@ -2388,7 +2637,7 @@ const parseSafeJson = async (res) => {
                 <Text style={[styles.driverStatusTitle, isRTL && styles.rtlText]}>
                   {driverOnline ? (lang === 'ar' ? 'حالة التواجد والخدمة' : 'Active Duty & Order Status') : (lang === 'ar' ? '⭕ خارج الخدمة (غير متصل)' : '⭕ Offline Status')}
                 </Text>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                   <View style={[styles.statusDot, { backgroundColor: driverOnline ? '#10b981' : '#cbd5e1' }]} />
                   <Text style={[styles.driverStatusText, isRTL && styles.rtlText, { fontWeight: '800' }]} numberOfLines={1}>
                     {driverOnline
@@ -2397,6 +2646,13 @@ const parseSafeJson = async (res) => {
                         : (lang === 'ar' ? 'جاهز للتوصيل — لا توجد شحنات نشطة' : 'Ready — No Active Deliveries'))
                       : t('youAreOffline')}
                   </Text>
+                  {driverOnline ? (
+                    <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>
+                        ⏱️ {lang === 'ar' ? `اليوم: ${workedHoursToday} س | الشهر: ${workedHoursMonth} س` : `Today: ${workedHoursToday} hrs | Month: ${workedHoursMonth} hrs`}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
               <TouchableOpacity
@@ -2454,39 +2710,29 @@ const parseSafeJson = async (res) => {
                             </View>
                           </View>
 
-                          <Text style={[theme.text, isRTL && styles.rtlText, { fontSize: 14, fontWeight: '600', lineHeight: 20 }]} numberOfLines={isExpanded ? 3 : 1}>
-                            {dt(item.client_address)}
-                          </Text>
+                          {(() => {
+                            const parsedAddr = parseAddress(item.client_address);
+                            const comp = parsedAddr.components;
+                            const hasComp = comp && (comp.street || comp.building || comp.district);
+                            const displayAddr = parsedAddr.formattedAddress || dt(item.client_address) || (typeof item.client_address === 'string' ? item.client_address : '') || (lang === 'ar' ? 'العنوان غير محدد' : 'No address provided');
 
-                        {/* Collapsible Action Drawer (Expanded State) */}
-                        {isExpanded && (
-                          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#f1f5f9', gap: 10 }}>
-                            <TouchableOpacity
-                              style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6 }}
-                              onPress={() => openOrderAuditModal(item)}
-                            >
-                              <Ionicons name="document-text-outline" size={16} color="#6366f1" />
-                              <Text style={{ color: '#6366f1', fontSize: 12, fontWeight: '800' }}>
-                                {lang === 'ar' ? 'عرض مسار وسجل الشحنة بالكامل والوسائط' : 'View Full Journey & Media Audit'}
-                              </Text>
-                            </TouchableOpacity>
+                            return (
+                              <View style={{ marginBottom: 10, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                                <Text style={[{ fontWeight: '900', fontSize: 14, color: theme.text.color, lineHeight: 20 }, isRTL && styles.rtlText]}>
+                                  📍 {displayAddr}
+                                </Text>
+                                {hasComp && (comp.floor_apt || comp.landmark) ? (
+                                  <Text style={[{ fontSize: 12, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 4 }, isRTL && styles.rtlText]}>
+                                    🏢 {dt(comp.floor_apt) || ''} {comp.landmark ? `• 🏛️ ${dt(comp.landmark)}` : ''}
+                                  </Text>
+                                ) : null}
+                              </View>
+                            );
+                          })()}
 
-                            {item.status === 'assigned' || item.status === 'notified_inventory' ? (
-                              <TouchableOpacity
-                                style={[styles.actionBtn, { backgroundColor: '#7c3aed', borderRadius: 12 }]}
-                                onPress={() => {
-                                  Alert.alert(
-                                    t('pickupGoToInventory'),
-                                    t('pickupGoToInventoryMsg'),
-                                    [{ text: lang === 'ar' ? 'حسناً، فهمت' : 'OK, Got It', style: 'default' }]
-                                  );
-                                }}
-                              >
-                                <Text style={styles.actionBtnText}>{t('pickupFromWarehouse')}</Text>
-                              </TouchableOpacity>
-                            ) : null}
-
-                            {item.status === 'handed_to_delivery' ? (
+                          {/* Always Visible Primary Delivery Actions */}
+                          <View style={{ marginTop: 6, gap: 8 }}>
+                            {['handed_to_delivery', 'assigned', 'notified_inventory', 'created'].includes(item.status) ? (
                               <TouchableOpacity
                                 style={[styles.actionBtn, { backgroundColor: '#2563eb', borderRadius: 12 }]}
                                 onPress={() => updateDeliveryStatus(item.id, 'in_transit')}
@@ -2497,59 +2743,101 @@ const parseSafeJson = async (res) => {
 
                             {item.status === 'in_transit' ? (
                               <View style={{ gap: 8 }}>
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                                {/* Single Primary Action Button */}
+                                <TouchableOpacity
+                                  style={[styles.actionBtn, { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12 }]}
+                                  onPress={() => {
+                                    setSelectedOrderForOutcome(item);
+                                    setStep1Outcome('full');
+                                    setStep2Outcome('full');
+                                    setStep3PaymentMethod('cash');
+                                    setDeliveredAmountInput(item.order_amount ? String(item.order_amount) : '');
+                                    setReturnedAmountInput('0.00');
+                                    setReturnedQuantityInput('1');
+                                    setReturnNotesInput('');
+                                    setPaymentAmountInput(item.outstanding_balance ? String(item.outstanding_balance) : (item.order_amount ? String(item.order_amount) : ''));
+                                    setPaymentProofAttachmentId(null);
+                                    setOutcomeStep(1);
+                                    setOutcomeModal(true);
+                                  }}
+                                >
+                                  <Text style={[styles.actionBtnText, { fontSize: 14, fontWeight: '900' }]}>
+                                    {lang === 'ar' ? '📋 تسليم الشحنة وتحصيل المبلغ' : '📋 Complete Delivery & Payment'}
+                                  </Text>
+                                </TouchableOpacity>
+
+                                {/* Quick Secondary Utility Pills */}
+                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                                   <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: '#10b981', flex: 1, borderRadius: 10 }]}
-                                    onPress={() => {
-                                      setSelectedOrderForOutcome(item);
-                                      setDeliveredAmountInput(item.order_amount ? String(item.order_amount) : '');
-                                      setReturnedAmountInput('0.00');
-                                      setReturnNotesInput('');
-                                      setOutcomeStep(1);
-                                      setOutcomeModal(true);
+                                    style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
+                                    onPress={async () => {
+                                      try {
+                                        const lat = item.latitude ? parseFloat(item.latitude) : null;
+                                        const lng = item.longitude ? parseFloat(item.longitude) : null;
+                                        let url;
+                                        if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+                                          url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                                        } else {
+                                          const parsedAddr = parseAddress(item.client_address);
+                                          const addressQuery = parsedAddr.googleMapsQuery || dt(item.client_address);
+                                          if (!addressQuery) {
+                                            Alert.alert(lang === 'ar' ? 'ملاحظة' : 'Notice', lang === 'ar' ? 'لا يوجد عنوان محدد لهذه الشحنة' : 'No address specified for this order');
+                                            return;
+                                          }
+                                          url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`;
+                                        }
+                                        await Linking.openURL(url);
+                                      } catch (err) {
+                                        Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', err.message || (lang === 'ar' ? 'تعذر فتح الخريطة' : 'Could not open map'));
+                                      }
                                     }}
                                   >
-                                    <Text style={styles.actionBtnText}>{lang === 'ar' ? 'النتيجة' : 'Outcome'}</Text>
+                                    <Ionicons name="map-outline" size={14} color="#2563eb" />
+                                    <Text style={{ color: '#2563eb', fontSize: 11, fontWeight: '800' }}>{lang === 'ar' ? 'خرائط' : 'Map'}</Text>
                                   </TouchableOpacity>
 
                                   <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: '#2563eb', flex: 1, borderRadius: 10 }]}
-                                    onPress={() => {
-                                      setSelectedOrderForPayment(item);
-                                      setPaymentAmountInput(item.order_amount ? String(item.order_amount) : '');
-                                      setPaymentModal(true);
-                                    }}
-                                  >
-                                    <Text style={styles.actionBtnText}>{lang === 'ar' ? 'تحصيل' : 'Payment'}</Text>
-                                  </TouchableOpacity>
-                                </View>
-
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
-                                  <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: '#7c3aed', flex: 1, borderRadius: 10 }]}
+                                    style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                                     onPress={() => {
                                       setSelectedCameraOrder(item);
+                                      setCameraStage('delivery_completion');
                                       setCameraModal(true);
                                     }}
                                   >
-                                    <Text style={styles.actionBtnText}>{lang === 'ar' ? 'صورة إثبات' : 'Photo Proof'}</Text>
+                                    <Ionicons name="camera-outline" size={14} color="#7c3aed" />
+                                    <Text style={{ color: '#7c3aed', fontSize: 11, fontWeight: '800' }}>{lang === 'ar' ? 'صورة إثبات' : 'Photo'}</Text>
                                   </TouchableOpacity>
 
                                   <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: '#ef4444', flex: 1, borderRadius: 10 }]}
+                                    style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#fef2f2', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                                     onPress={() => {
                                       setSelectedOrderId(item.id);
                                       setFailureModal(true);
                                     }}
                                   >
-                                    <Text style={styles.actionBtnText}>{lang === 'ar' ? 'فشل التسليم' : 'Failed'}</Text>
+                                    <Ionicons name="alert-circle-outline" size={14} color="#ef4444" />
+                                    <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '800' }}>{lang === 'ar' ? 'فشل التسليم' : 'Failed'}</Text>
                                   </TouchableOpacity>
                                 </View>
                               </View>
                             ) : null}
                           </View>
-                        )}
-                      </View>
+
+                          {/* Optional Extra Audit Log Link (Collapsible or Direct) */}
+                          {isExpanded && (
+                            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#f1f5f9' }}>
+                              <TouchableOpacity
+                                style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 }}
+                                onPress={() => openOrderAuditModal(item)}
+                              >
+                                <Ionicons name="document-text-outline" size={16} color="#6366f1" />
+                                <Text style={{ color: '#6366f1', fontSize: 12, fontWeight: '800' }}>
+                                  {lang === 'ar' ? 'عرض مسار وسجل الشحنة بالكامل والوسائط' : 'View Full Journey & Media Audit'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
                     );
                   })
                 )}
@@ -2813,27 +3101,53 @@ const parseSafeJson = async (res) => {
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('tabDriverRoster')}</Text>
                 {safeDeliveryGuys.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
-                ) : safeDeliveryGuys.map((g) => (
-                  <TouchableOpacity
-                    key={g.id || g.delivery_guy_id}
-                    activeOpacity={0.85}
-                    style={[styles.orderCard, theme.cardBg, styles.statCardAccentEmerald, { padding: 16, borderRadius: 14 }]}
-                    onPress={() => openDriverStatsModal(g)}
-                  >
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
-                        <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
-                        <Text style={[styles.clientName, theme.text, { fontSize: 15 }]}>{dt(g.name || g.delivery_guy_name)} (@{g.username || 'driver'})</Text>
+                ) : safeDeliveryGuys.map((g) => {
+                  const sh = shiftSummaries.find(s => String(s.driver_id) === String(g.id || g.delivery_guy_id));
+                  const dailyH = sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00';
+                  const monthlyH = sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00';
+                  return (
+                    <TouchableOpacity
+                      key={g.id || g.delivery_guy_id}
+                      activeOpacity={0.85}
+                      style={[styles.orderCard, theme.cardBg, styles.statCardAccentEmerald, { padding: 16, borderRadius: 14, marginBottom: 12 }]}
+                      onPress={() => openDriverStatsModal(g)}
+                    >
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 140 }}>
+                          <View style={[styles.pulseOnline, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]} />
+                          <Text style={[styles.clientName, theme.text, { fontSize: 15 }]}>{dt(g.name || g.delivery_guy_name)} (@{g.username || 'driver'})</Text>
+                        </View>
+                        <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
+                          {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
+                        </Text>
                       </View>
-                      <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
-                        {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
+
+                      {/* Working Hours Telemetry (Daily Reset & Monthly Accumulation) */}
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12, marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                        <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: '700' }}>
+                            {lang === 'ar' ? '⏱️ اليوم (إعادة تصفير يومية)' : '⏱️ Worked Today (Daily)'}
+                          </Text>
+                          <Text style={{ fontSize: 13, color: '#2563eb', fontWeight: '900', marginTop: 2 }}>
+                            {dailyH} {lang === 'ar' ? 'ساعة' : 'hrs'}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: '700' }}>
+                            {lang === 'ar' ? '📅 الشهر (تراكمي شهري)' : '📅 Worked Month (Accumulated)'}
+                          </Text>
+                          <Text style={{ fontSize: 13, color: '#7c3aed', fontWeight: '900', marginTop: 2 }}>
+                            {monthlyH} {lang === 'ar' ? 'ساعة' : 'hrs'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>
+                        {lang === 'ar' ? 'اضغط لعرض إحصائيات الأداء وميزانية العهدة ' : 'Tap to view performance stats & wallet budget '}
                       </Text>
-                    </View>
-                    <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>
-                      {lang === 'ar' ? 'اضغط لعرض إحصائيات الأداء وميزانية العهدة ' : 'Tap to view performance stats & wallet budget '}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
@@ -3767,17 +4081,19 @@ const parseSafeJson = async (res) => {
                   onChangeText={setOrderNumber}
                 />
 
-                {/* Field 2: Delivery Address */}
-                <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('clientAddressLabel')} *</Text>
-                <TextInput
-                  style={[styles.input, styles.multilineInput, theme.inputBg, theme.text, isRTL && styles.rtlText]}
-                  placeholder={t('clientAddressPlaceholder')}
-                  placeholderTextColor="#94a3b8"
-                  multiline
-                  numberOfLines={2}
-                  value={clientAddress}
-                  onChangeText={setClientAddress}
-                />
+                {/* Field 2: Delivery Address (Single Field) */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>
+                    📍 {lang === 'ar' ? 'عنوان التوصيل (مطلوب):' : 'Delivery Address (Required):'} *
+                  </Text>
+                  <TextInput
+                    style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
+                    placeholder={lang === 'ar' ? 'أدخل عنوان التوصيل الكامل...' : 'Enter full delivery address...'}
+                    placeholderTextColor="#94a3b8"
+                    value={clientAddress}
+                    onChangeText={setClientAddress}
+                  />
+                </View>
 
                 {/* Field 3: Amount to Collect */}
                 <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{t('orderAmountLabel')} *</Text>
@@ -4060,7 +4376,7 @@ const parseSafeJson = async (res) => {
               </View>
             )}
 
-            {selectedOrderForStatus && selectedOrderForStatus.status === 'handed_to_delivery' && (
+            {selectedOrderForStatus && ['handed_to_delivery', 'assigned', 'notified_inventory', 'created'].includes(selectedOrderForStatus.status) && (
               <View style={{ marginTop: 12 }}>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#2563eb' }]}
@@ -4522,8 +4838,8 @@ const parseSafeJson = async (res) => {
                             return (
                               <View key={att.id || idx} style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
                                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#7c3aed' }}>
-                                    {att.stage ? att.stage.toUpperCase().replace('_', ' ') : 'ATTACHMENT'}
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#7c3aed' }}>
+                                    {getStageTitle(att.stage, lang)}
                                   </Text>
                                   <Text style={[theme.textMuted, { fontSize: 10 }]}>
                                     {new Date(att.created_at || Date.now()).toLocaleString()}
@@ -4731,7 +5047,7 @@ const parseSafeJson = async (res) => {
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0', gap: 6, flexWrap: 'wrap' }}>
                     <View>
                       <Text style={[theme.textMuted, { fontSize: 10, fontWeight: '700' }]}>{lang === 'ar' ? 'الرصيد المتاح' : 'Available Balance'}</Text>
-<Text style={[theme.textMuted, { fontSize: 10, fontWeight: '700' }]}>{lang === 'ar' ? 'إجمالي المشحون' : 'Total Topped Up'}</Text>
+                      <Text style={[theme.textMuted, { fontSize: 10, fontWeight: '700' }]}>{lang === 'ar' ? 'إجمالي المشحون' : 'Total Topped Up'}</Text>
                       <Text style={{ color: '#2563eb', fontSize: 15, fontWeight: '800' }}>
                         ${selectedDriverLedgerData.pocket_wallet?.total_topped_up?.toFixed(2)}
                       </Text>
@@ -4838,24 +5154,41 @@ const parseSafeJson = async (res) => {
         onCancel={() => setShowLocationModal(false)}
       />
 
-      {/* Delivery Outcome & Payment Method Selection Modal (3-Step Wizard Flow) */}
+      {/* Delivery Outcome Selection Modal (4-Step Wizard Flow + Modern UI) */}
       <Modal visible={outcomeModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
 
-            {/* Step 1 Screen: How was it delivered? (5 Options) */}
+            {/* Step 1 Screen: How was it delivered? */}
             {outcomeStep === 1 ? (
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, flex: 1 }, isRTL && styles.rtlText]}>
-                    {lang === 'ar' ? '📋 الخطوة 1 من 3: كيف تم التسليم؟' : '📋 Step 1 of 3: How was it delivered?'}
+                  <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, flex: 1, fontSize: 16 }, isRTL && styles.rtlText]}>
+                    {lang === 'ar' ? '📋 الخطوة 1 من 4: كيف تم التسليم؟' : '📋 Step 1 of 4: How was it delivered?'}
                   </Text>
                   <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>1/3</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>1/4</Text>
                   </View>
                 </View>
 
-                <Text style={[theme.textMuted, { fontSize: 12, marginBottom: 14 }, isRTL && styles.rtlText]}>
+                {/* Order Quick Summary Card */}
+                {selectedOrderForOutcome && (
+                  <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 10, borderRadius: 12, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0', marginBottom: 12 }}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontWeight: '900', color: theme.text.color, fontSize: 13 }}>
+                        #{selectedOrderForOutcome.order_number || selectedOrderForOutcome.id}
+                      </Text>
+                      <Text style={{ fontWeight: '800', color: '#10b981', fontSize: 13 }}>
+                        {selectedOrderForOutcome.order_amount ? `${selectedOrderForOutcome.order_amount} EGP` : ''}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 2 }} numberOfLines={1}>
+                      👤 {selectedOrderForOutcome.client_name || ''} • 📍 {dt(selectedOrderForOutcome.client_address)}
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={[theme.textMuted, { fontSize: 12, marginBottom: 12 }, isRTL && styles.rtlText]}>
                   {lang === 'ar'
                     ? 'اختر النتيجة الفعلية لتسليم الشحنة للمستلم:'
                     : 'Select how the order delivery was executed:'}
@@ -4898,10 +5231,10 @@ const parseSafeJson = async (res) => {
                 {step1Outcome === 'partial' && (
                   <View style={{ marginTop: 10, marginBottom: 14, padding: 14, backgroundColor: isDarkMode ? '#1e293b' : '#fffbe8', borderRadius: 12, borderWidth: 1, borderColor: '#fde68a' }}>
                     <Text style={{ fontWeight: '900', color: '#d97706', fontSize: 14, marginBottom: 10, textAlign: isRTL ? 'right' : 'left' }}>
-                      {lang === 'ar' ? '📦 تفاصيل التسليم الجزئي:' : '📦 Partial Delivery Breakdown:'}
+                      📦 {lang === 'ar' ? 'تفاصيل التسليم الجزئي:' : 'Partial Delivery Breakdown:'}
                     </Text>
 
-                    <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{lang === 'ar' ? 'مبلغ السلع المستلمة ($)' : 'Delivered Items Amount ($)'}</Text>
+                    <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{lang === 'ar' ? 'مبلغ السلع المستلمة (جنيه)' : 'Delivered Items Amount (EGP)'}</Text>
                     <TextInput
                       style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
                       keyboardType="numeric"
@@ -4914,17 +5247,17 @@ const parseSafeJson = async (res) => {
                           setReturnedAmountInput(Math.max(0, orderAmt - delAmt).toFixed(2));
                         }
                       }}
-                      placeholder="e.g. 150.00"
+                      placeholder="0.00"
                       placeholderTextColor="#94a3b8"
                     />
 
-                    <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{lang === 'ar' ? 'مبلغ السلع المرتجعة ($)' : 'Returned Items Amount ($)'}</Text>
+                    <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>{lang === 'ar' ? 'مبلغ السلع المرتجعة (جنيه)' : 'Returned Items Amount (EGP)'}</Text>
                     <TextInput
                       style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
                       keyboardType="numeric"
                       value={returnedAmountInput}
                       onChangeText={setReturnedAmountInput}
-                      placeholder="e.g. 100.00"
+                      placeholder="0.00"
                       placeholderTextColor="#94a3b8"
                     />
 
@@ -4948,7 +5281,7 @@ const parseSafeJson = async (res) => {
                     style={[styles.primaryButton, { flex: 1, backgroundColor: '#2563eb' }]}
                     onPress={() => setOutcomeStep(2)}
                   >
-                    <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي ←' : 'Next →'}</Text>
+                    <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (ما المبلغ المحصل؟) ←' : 'Next (Collection) →'}</Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -4957,10 +5290,10 @@ const parseSafeJson = async (res) => {
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, fontSize: 15, flex: 1 }, isRTL && styles.rtlText]}>
-                    {lang === 'ar' ? '📋 الخطوة 2 من 3: ما المبلغ المحصل؟' : '📋 Step 2 of 3: How much was collected?'}
+                    {lang === 'ar' ? '📋 الخطوة 2 من 4: ما المبلغ المحصل؟' : '📋 Step 2 of 4: How much was collected?'}
                   </Text>
                   <View style={{ backgroundColor: '#10b981', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>2/3</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>2/4</Text>
                   </View>
                 </View>
 
@@ -5016,62 +5349,73 @@ const parseSafeJson = async (res) => {
                   );
                 })}
 
+                {/* Step 2 Partial Collection Amount Breakdown (Similar to Partial Delivery) */}
+                {step2Outcome === 'partial_collection' && (
+                  <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#fffbebfb', padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: '#fde68a', marginVertical: 10, gap: 10 }}>
+                    <Text style={[{ fontSize: 13, fontWeight: '900', color: '#d97706' }, isRTL && styles.rtlText]}>
+                      💵 {lang === 'ar' ? 'تفاصيل وإدخال مبلغ التحصيل الجزئي:' : 'Partial Collection Amount Breakdown:'}
+                    </Text>
+
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isDarkMode ? '#0f172a' : '#fef3c7', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#fcd34d' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#b45309' }}>
+                        {lang === 'ar' ? 'إجمالي سعر الشحنة الاصلي:' : 'Original Total Order Amount:'}
+                      </Text>
+                      <Text style={{ fontSize: 14, fontWeight: '900', color: '#059669' }}>
+                        ${parseFloat(selectedOrderForOutcome?.order_amount || 0).toFixed(2)}
+                      </Text>
+                    </View>
+
+                    <Text style={[styles.inputLabel, theme.text, { fontSize: 12, fontWeight: '800', marginTop: 2 }, isRTL && styles.rtlText]}>
+                      {lang === 'ar' ? 'المبلغ المحصل فعلياً من العميل (جنيه):' : 'Actual Amount Collected from Customer (EGP):'} *
+                    </Text>
+                    <TextInput
+                      style={[styles.input, theme.inputBg, theme.text, { fontSize: 15, fontWeight: '900', color: '#2563eb' }, isRTL && styles.rtlText]}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor="#94a3b8"
+                      value={paymentAmountInput}
+                      onChangeText={setPaymentAmountInput}
+                    />
+
+                    {(() => {
+                      const totalAmt = parseFloat(selectedOrderForOutcome?.order_amount || 0);
+                      const colAmt = parseFloat(paymentAmountInput || 0);
+                      const remainingAmt = Math.max(0, totalAmt - colAmt);
+                      return (
+                        <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#fef2f2', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#fca5a5', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#991b1b' }}>
+                            {lang === 'ar' ? 'المبلغ المتبقي كعجز / آجل غير محصل:' : 'Remaining Unpaid / Debt Balance:'}
+                          </Text>
+                          <Text style={{ fontSize: 14, fontWeight: '900', color: '#dc2626' }}>
+                            ${remainingAmt.toFixed(2)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </View>
+                )}
+
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, marginBottom: 16 }}>
                   <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(1)}>
                     <Text style={styles.cancelButtonText}>{lang === 'ar' ? '← رجوع' : '← Back'}</Text>
                   </TouchableOpacity>
-
-                  {step2Outcome === 'none' ? (
-                    <TouchableOpacity
-                      style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
-                      disabled={actionLoadingId === 'confirmOutcome'}
-                      onPress={async () => {
-                        if (!selectedOrderForOutcome) return;
-                        setActionLoadingId('confirmOutcome');
-                        try {
-                          const payload = {
-                            delivery_outcome: step1Outcome,
-                            collection_outcome: 'none',
-                            delivered_items_amount: parseFloat(deliveredAmountInput || 0),
-                            returned_items_amount: parseFloat(returnedAmountInput || 0),
-                            returned_quantity: parseInt(returnedQuantityInput || 1, 10),
-                            return_notes: returnNotesInput ? returnNotesInput.trim() : null
-                          };
-
-                          const finalStatus = ['full', 'partial'].includes(step1Outcome) ? 'delivered' : 'delivery_failed';
-                          await updateDeliveryStatus(selectedOrderForOutcome.id, finalStatus, payload.delivered_items_amount, '', payload);
-                          setOutcomeModal(false);
-                          setRecordedAudioNote(null);
-                          setRecordedAudioDuration(0);
-                          showToast(lang === 'ar' ? 'تم تسجيل وتأكيد نتيجة التسليم بدون تحصيل!' : 'Delivery outcome saved with no collection!');
-                        } catch (err) {
-                          Alert.alert(t('alertError'), err.message);
-                        } finally {
-                          setActionLoadingId(null);
-                        }
-                      }}
-                    >
-                      {actionLoadingId === 'confirmOutcome' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'تأكيد وإنهـاء ✓' : 'Confirm & Finish ✓'}</Text>}
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
-                      onPress={() => setOutcomeStep(3)}
-                    >
-                      <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (طريقة الدفع) ←' : 'Next (Payment) →'}</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
+                    onPress={() => setOutcomeStep(3)}
+                  >
+                    <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (طريقة الدفع) ←' : 'Next (Payment) →'}</Text>
+                  </TouchableOpacity>
                 </View>
               </ScrollView>
-            ) : (
-              /* Step 3 Screen: Payment Method & Driver Notes */
+            ) : outcomeStep === 3 ? (
+              /* Step 3 Screen: Payment Method & Amount */
               <ScrollView showsVerticalScrollIndicator={false}>
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, fontSize: 15, flex: 1 }, isRTL && styles.rtlText]}>
-                    {lang === 'ar' ? '💳 الخطوة 3 من 3: طريقة الدفع والملاحظات' : '💳 Step 3 of 3: Payment Method & Notes'}
+                    {lang === 'ar' ? '💳 الخطوة 3 من 4: طريقة التحصيل والمبلغ' : '💳 Step 3 of 4: Payment Method & Amount'}
                   </Text>
                   <View style={{ backgroundColor: '#8b5cf6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>3/3</Text>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>3/4</Text>
                   </View>
                 </View>
 
@@ -5128,11 +5472,95 @@ const parseSafeJson = async (res) => {
                   );
                 })}
 
-                {/* Driver Voice Note Recording & Additional Details */}
                 <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginTop: 10 }, isRTL && styles.rtlText]}>
-                  {lang === 'ar' ? 'تسجيل ملاحظة صوتية وتفاصيل التسليم:' : 'Voice Recording & Driver Notes:'}
+                  {lang === 'ar' ? 'المبلغ المحصل (جنيه):' : 'Collected Payment Amount (EGP):'}
                 </Text>
+                <TextInput
+                  style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
+                  keyboardType="numeric"
+                  placeholder="0.00"
+                  value={paymentAmountInput}
+                  onChangeText={setPaymentAmountInput}
+                />
 
+                {['e_wallet', 'instapay', 'vodafone_cash'].includes(step3PaymentMethod) && (
+                  <View style={{ marginTop: 10, padding: 12, backgroundColor: isDarkMode ? '#1e293b' : '#f5f3ff', borderRadius: 12, borderWidth: 1, borderColor: '#ddd6fe' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#7c3aed', marginBottom: 6 }}>
+                      📸 {lang === 'ar' ? 'صورة إيصال/تحويل المحفظة الإلكترونية (إجباري):' : 'E-Wallet Transfer Screenshot (Required):'}
+                    </Text>
+                    <PhotoCapture
+                      orderId={selectedOrderForOutcome?.id}
+                      stage="payment_confirmation"
+                      token={token}
+                      apiBase={apiBase}
+                      label={lang === 'ar' ? '📷 التقاط صورة الإيصال' : '📷 Take Transfer Receipt Photo'}
+                      onPhotoCaptured={(storageUrl, attId) => {
+                        if (attId) setPaymentProofAttachmentId(attId);
+                        showToast(lang === 'ar' ? '✅ تم إرفاق صورة الإيصال بنجاح' : '✅ Transfer receipt photo attached!');
+                      }}
+                    />
+                  </View>
+                )}
+
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, marginBottom: 16 }}>
+                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(2)}>
+                    <Text style={styles.cancelButtonText}>{lang === 'ar' ? '← رجوع' : '← Back'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { flex: 1, backgroundColor: '#8b5cf6' }]}
+                    onPress={() => setOutcomeStep(4)}
+                  >
+                    <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (الإثبات النهائي) ←' : 'Next (Final Proof) →'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            ) : (
+              /* Step 4 Screen: Final Proof, Voice Feedback & Submission */
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={[styles.modalTitle, theme.text, { marginBottom: 0, fontSize: 15, flex: 1 }, isRTL && styles.rtlText]}>
+                    {lang === 'ar' ? '📋 الخطوة 4 من 4: الإثبات النهائي والتأكيد' : '📋 Step 4 of 4: Final Proof & Confirm'}
+                  </Text>
+                  <View style={{ backgroundColor: '#10b981', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>4/4</Text>
+                  </View>
+                </View>
+
+                {/* Outcome Summary Card */}
+                <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#ecfdf5', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#a7f3d0', marginBottom: 14, gap: 6 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#047857', fontWeight: '700' }}>{lang === 'ar' ? 'نتيجة التسليم:' : 'Delivery Outcome:'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color }}>
+                      {DELIVERY_OUTCOMES_STEP1.find(s => s.value === step1Outcome)?.[lang === 'ar' ? 'label_ar' : 'label_en']}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: '#047857', fontWeight: '700' }}>{lang === 'ar' ? 'طريقة والدفع:' : 'Payment Method:'}</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color }}>
+                      {PAYMENT_METHODS_STEP3.find(s => s.value === step3PaymentMethod)?.[lang === 'ar' ? 'label_ar' : 'label_en']} ({paymentAmountInput || '0'} EGP)
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Optional Delivery Package Photo */}
+                <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800' }, isRTL && styles.rtlText]}>
+                  📷 {lang === 'ar' ? 'صورة تسليم الطرد / المستلم (اختياري):' : 'Delivery Package Photo (Optional):'}
+                </Text>
+                <PhotoCapture
+                  orderId={selectedOrderForOutcome?.id}
+                  stage="delivery_completion"
+                  token={token}
+                  apiBase={apiBase}
+                  label={lang === 'ar' ? '📷 التقاط صورة التسليم' : '📷 Take Package Proof Photo'}
+                  onPhotoCaptured={() => {
+                    showToast(lang === 'ar' ? '✅ تم إرفاق صورة التسليم بنجاح' : '✅ Package proof photo attached!');
+                  }}
+                />
+
+                {/* Driver Voice Note Recording */}
+                <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginTop: 12 }, isRTL && styles.rtlText]}>
+                  🎙️ {lang === 'ar' ? 'تسجيل ملاحظة صوتية (اختياري):' : 'Voice Note Feedback (Optional):'}
+                </Text>
                 <VoiceNoteRecorder
                   lang={lang}
                   isRTL={isRTL}
@@ -5147,20 +5575,20 @@ const parseSafeJson = async (res) => {
                 />
 
                 <Text style={[styles.inputLabel, theme.text, { fontSize: 12, marginTop: 6 }, isRTL && styles.rtlText]}>
-                  {lang === 'ar' ? 'ملاحظات نصية إضافية (اختياري):' : 'Additional Text Notes (Optional):'}
+                  {lang === 'ar' ? 'ملاحظات نصية إضافية (اختياري):' : 'Additional Notes (Optional):'}
                 </Text>
                 <TextInput
-                  style={[styles.input, theme.inputBg, theme.text, { height: 70, textAlignVertical: 'top' }, isRTL && styles.rtlText]}
+                  style={[styles.input, theme.inputBg, theme.text, { height: 60, textAlignVertical: 'top' }, isRTL && styles.rtlText]}
                   multiline
-                  numberOfLines={3}
-                  placeholder={lang === 'ar' ? 'أضف أي ملاحظات نصية إضافية عن التسليم...' : 'Add any optional text notes about delivery...'}
+                  numberOfLines={2}
+                  placeholder={lang === 'ar' ? 'أضف أي ملاحظات إضافية...' : 'Add any extra notes...'}
                   placeholderTextColor="#94a3b8"
                   value={returnNotesInput}
                   onChangeText={setReturnNotesInput}
                 />
 
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, marginBottom: 16 }}>
-                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(1)}>
+                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(3)}>
                     <Text style={styles.cancelButtonText}>{lang === 'ar' ? '← رجوع' : '← Back'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -5173,13 +5601,16 @@ const parseSafeJson = async (res) => {
                         const payload = {
                           delivery_outcome: step1Outcome,
                           collection_outcome: step2Outcome,
+                          payment_method: step2Outcome === 'none' ? 'none' : step3PaymentMethod,
+                          payment_amount: parseFloat(paymentAmountInput || 0),
+                          proof_attachment_id: paymentProofAttachmentId || undefined,
                           delivered_items_amount: parseFloat(deliveredAmountInput || 0),
                           returned_items_amount: parseFloat(returnedAmountInput || 0),
                           returned_quantity: parseInt(returnedQuantityInput || 1, 10),
                           return_notes: returnNotesInput ? returnNotesInput.trim() : null
                         };
 
-                        // 1. Submit voice note recording if recorded
+                        // 1. Submit voice note feedback if recorded
                         if (recordedAudioNote) {
                           try {
                             await fetch(`${apiBase}/orders/${selectedOrderForOutcome.id}/feedback`, {
@@ -5198,22 +5629,15 @@ const parseSafeJson = async (res) => {
                           }
                         }
 
-                        // 2. Submit delivery outcome update
+                        // 3. Update delivery outcome status
                         const finalStatus = ['full', 'partial'].includes(step1Outcome) ? 'delivered' : 'delivery_failed';
                         await updateDeliveryStatus(selectedOrderForOutcome.id, finalStatus, payload.delivered_items_amount, '', payload);
+
                         setOutcomeModal(false);
                         setRecordedAudioNote(null);
                         setRecordedAudioDuration(0);
-                        showToast(lang === 'ar' ? 'تم تسجيل وتأكيد نتيجة التسليم والملاحظة بنجاح!' : 'Delivery outcome & voice note confirmed & saved!');
-
-                        // 3. Auto-trigger payment recording modal if collection outcome != 'none'
-                        if (step2Outcome !== 'none') {
-                          setSelectedOrderForPayment(selectedOrderForOutcome);
-                          setPaymentAmountInput(selectedOrderForOutcome.order_amount ? String(selectedOrderForOutcome.order_amount) : '');
-                          setPaymentMethodInput(''); // REMOVE GUESS - EXPLICIT SELECTION REQUIRED
-                          setPaymentProofAttachmentId(null);
-                          setPaymentModal(true);
-                        }
+                        showToast(lang === 'ar' ? '✅ تم إكمال الشحنة وتحصيل الدفعة بنجاح!' : '✅ Order delivery & payment completed successfully!');
+                        fetchData();
                       } catch (err) {
                         Alert.alert(t('alertError'), err.message);
                       } finally {
@@ -5224,7 +5648,7 @@ const parseSafeJson = async (res) => {
                     {actionLoadingId === 'confirmOutcome' ? (
                       <ActivityIndicator color="#ffffff" />
                     ) : (
-                      <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'تأكيد وحفظ النتيجة' : 'Confirm & Save'}</Text>
+                      <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'تأكيد وإكـمال التسليم ✓' : 'Confirm & Complete ✓'}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -5278,8 +5702,8 @@ const parseSafeJson = async (res) => {
                     if (!cameraFilterText.trim()) return true;
                     const q = cameraFilterText.toLowerCase();
                     return (
-                      (o.tracking_number && o.tracking_number.toLowerCase().includes(q)) ||
-                      (o.client_address && o.client_address.toLowerCase().includes(q))
+                      (o.tracking_number && String(o.tracking_number).toLowerCase().includes(q)) ||
+                      (dt(o.client_address).toLowerCase().includes(q))
                     );
                   });
 
@@ -5350,35 +5774,10 @@ const parseSafeJson = async (res) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Photo Stage Purpose Selection */}
-                <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800' }, isRTL && styles.rtlText]}>
-                  🎯 {lang === 'ar' ? 'الغرض من الصورة الإثباتية:' : 'Select Photo Attachment Stage:'}
+                {/* Automatic Context Tagged Photo Capture (Approach A) */}
+                <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginBottom: 8 }, isRTL && styles.rtlText]}>
+                  📷 {lang === 'ar' ? 'إرفاق صورة إثبات الشحنة:' : 'Attach Order Proof Photo:'}
                 </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                  {[
-                    { id: 'payment_confirmation', label_ar: '💳 إيصال تحصيل الدفعة', label_en: 'Payment Receipt' },
-                    { id: 'delivery_completion', label_ar: '📦 إثبات التسليم', label_en: 'Delivery Proof' },
-                    { id: 'return_verification', label_ar: '↩️ صورة المرتجع', label_en: 'Returned Item' },
-                    { id: 'inventory_handoff', label_ar: '🏬 حالة الاستلام', label_en: 'Warehouse Handoff' }
-                  ].map((stg) => (
-                    <TouchableOpacity
-                      key={stg.id}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: 10,
-                        borderWidth: cameraStage === stg.id ? 2 : 1,
-                        backgroundColor: cameraStage === stg.id ? '#7c3aed' : (isDarkMode ? '#1e293b' : '#f1f5f9'),
-                        borderColor: cameraStage === stg.id ? '#7c3aed' : (isDarkMode ? '#334155' : '#cbd5e1')
-                      }}
-                      onPress={() => setCameraStage(stg.id)}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: cameraStage === stg.id ? '#ffffff' : (isDarkMode ? '#94a3b8' : '#475569') }}>
-                        {lang === 'ar' ? stg.label_ar : stg.label_en}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
 
                 {/* Native Embedded Photo Capture Component */}
                 <PhotoCapture
@@ -5497,6 +5896,28 @@ const parseSafeJson = async (res) => {
         </View>
       </Modal>
 
+      {/* GLOBAL BUFFER LOADER OVERLAY */}
+      <Modal
+        transparent
+        visible={!!bufferLoadingMsg || !!actionLoadingId}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.bufferModalOverlay}>
+          <View style={styles.bufferCardMobile}>
+            <View style={styles.bufferSpinnerCircle}>
+              <ActivityIndicator size="large" color="#3b82f6" />
+            </View>
+            <Text style={[styles.bufferTitleMobile, isRTL && styles.rtlText]}>
+              {bufferLoadingMsg || (lang === 'ar' ? 'جاري تنفيذ الإجراء وإرسال البيانات...' : 'Processing action & sync...')}
+            </Text>
+            <Text style={[styles.bufferSubMobile, isRTL && styles.rtlText]}>
+              {lang === 'ar' ? 'يرجى الانتظار لحظات...' : 'Please wait a moment...'}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -5576,6 +5997,103 @@ const styles = StyleSheet.create({
   logoutBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
   toastBanner: { backgroundColor: '#2563eb', padding: 14, marginHorizontal: 16, marginTop: 12, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 3 },
   toastText: { color: '#ffffff', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  enhancedToastBanner: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8
+  },
+  toastSuccess: {
+    backgroundColor: '#064e3b',
+    borderColor: '#10b981'
+  },
+  toastError: {
+    backgroundColor: '#7f1d1d',
+    borderColor: '#ef4444'
+  },
+  toastWarning: {
+    backgroundColor: '#78350f',
+    borderColor: '#f59e0b'
+  },
+  toastInfo: {
+    backgroundColor: '#1e3a8a',
+    borderColor: '#3b82f6'
+  },
+  toastIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  toastBannerTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800'
+  },
+  toastBannerMsg: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1
+  },
+  bufferModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(11, 15, 25, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  bufferCardMobile: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.4)',
+    borderRadius: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    width: '88%',
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12
+  },
+  bufferSpinnerCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18
+  },
+  bufferTitleMobile: {
+    color: '#f8fafc',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6
+  },
+  bufferSubMobile: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center'
+  },
   driverStatusCard: { padding: 18, borderRadius: 18, marginBottom: 18, alignItems: 'center', justifyContent: 'space-between' },
   driverStatusTitle: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   driverStatusText: { color: '#ffffff', fontSize: 13, marginTop: 2 },

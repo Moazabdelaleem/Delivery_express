@@ -7,7 +7,7 @@ const { sendPushNotification } = require('../utils/pushNotifier');
 // in_transit → delivered | delivery_failed (driver completes or fails)
 // delivery_failed → returned_to_company (driver returns package)
 const VALID_PREDECESSORS = {
-  in_transit:          ['handed_to_delivery', 'assigned'],
+  in_transit:          ['handed_to_delivery', 'assigned', 'notified_inventory', 'created'],
   delivered:           ['in_transit', 'handed_to_delivery'],
   delivery_failed:     ['in_transit', 'handed_to_delivery'],
   returned_to_company: ['delivery_failed']
@@ -16,13 +16,18 @@ const VALID_PREDECESSORS = {
 // Create Order (Supervisor)
 exports.createOrder = async (req, res) => {
   try {
-    const { tracking_number: customTracking, client_address, order_details, order_amount, delivery_guy_id, payment_type } = req.body;
+    const { tracking_number: customTracking, client_address, latitude, longitude, order_details, order_amount, delivery_guy_id, payment_type } = req.body;
 
-    if (!client_address || !client_address.trim()) {
-      return res.status(400).json({ error: 'Delivery address is required to create an order.' });
+    const hasAddress = Boolean(client_address && (typeof client_address === 'object' || String(client_address).trim().length > 0));
+    const latVal = (latitude !== undefined && latitude !== null && latitude !== '') ? parseFloat(latitude) : null;
+    const lngVal = (longitude !== undefined && longitude !== null && longitude !== '') ? parseFloat(longitude) : null;
+    const hasPin = !isNaN(latVal) && !isNaN(lngVal) && latVal !== null && lngVal !== null;
+
+    if (!hasAddress && !hasPin) {
+      return res.status(400).json({ error: 'Either a delivery address or a map pin location is required to create an order.' });
     }
 
-    const cAddress = client_address.trim();
+    const cAddress = client_address ? (typeof client_address === 'object' ? JSON.stringify(client_address) : String(client_address).trim()) : '';
     const cDetails = order_details || 'Standard package';
 
     if (!customTracking || !customTracking.trim()) {
@@ -36,10 +41,10 @@ exports.createOrder = async (req, res) => {
     const pType            = (payment_type && validPaymentTypes.includes(payment_type)) ? payment_type : 'pay_after_delivery';
 
     const result = await db.query(
-      `INSERT INTO orders (tracking_number, client_address, order_details, order_amount, status, supervisor_id, delivery_guy_id, payment_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO orders (tracking_number, client_address, latitude, longitude, order_details, order_amount, status, supervisor_id, delivery_guy_id, payment_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [tracking_number, cAddress, cDetails, amount, initialStatus, req.user.id, delivery_guy_id || null, pType]
+      [tracking_number, cAddress, hasPin ? latVal : null, hasPin ? lngVal : null, cDetails, amount, initialStatus, req.user.id, delivery_guy_id || null, pType]
     );
 
     const newOrder = result.rows[0];
@@ -86,7 +91,7 @@ exports.createOrder = async (req, res) => {
 exports.updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { tracking_number, client_address, order_amount, delivery_guy_id, payment_type } = req.body;
+    const { tracking_number, client_address, latitude, longitude, order_amount, delivery_guy_id, payment_type } = req.body;
 
     const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
     if (orderRes.rows.length === 0) {
@@ -95,18 +100,21 @@ exports.updateOrder = async (req, res) => {
 
     const currentOrder = orderRes.rows[0];
     const newTracking  = tracking_number && tracking_number.trim() ? tracking_number.trim() : currentOrder.tracking_number;
-    const newAddress   = client_address && client_address.trim() ? client_address.trim() : currentOrder.client_address;
-    const newAmount    = order_amount !== undefined ? parseFloat(order_amount) : currentOrder.order_amount;
-    const newDriverId  = delivery_guy_id !== undefined ? delivery_guy_id : currentOrder.delivery_guy_id;
+    const newAddress   = client_address ? (typeof client_address === 'object' ? JSON.stringify(client_address) : String(client_address).trim()) : currentOrder.client_address;
+    const newLat       = (latitude !== undefined && latitude !== null && latitude !== '') ? parseFloat(latitude) : currentOrder.latitude;
+    const newLng       = (longitude !== undefined && longitude !== null && longitude !== '') ? parseFloat(longitude) : currentOrder.longitude;
+    const parsedAmount = (order_amount !== undefined && order_amount !== null && order_amount !== '') ? parseFloat(order_amount) : NaN;
+    const newAmount    = !isNaN(parsedAmount) ? parsedAmount : currentOrder.order_amount;
+    const newDriverId  = (delivery_guy_id !== undefined && delivery_guy_id !== '') ? delivery_guy_id : currentOrder.delivery_guy_id;
     const newStatus    = newDriverId ? (currentOrder.status === 'created' ? 'assigned' : currentOrder.status) : currentOrder.status;
-    const validPaymentTypes = ['full_upfront', 'pay_after_delivery', 'accounts_payable', 'other'];
+    const validPaymentTypes = ['full_upfront', 'pay_after_delivery', 'accounts_payable', 'installments', 'other'];
     const newPaymentType    = payment_type && validPaymentTypes.includes(payment_type) ? payment_type : currentOrder.payment_type;
 
     const updateRes = await db.query(
       `UPDATE orders
-       SET tracking_number = $1, client_address = $2, order_amount = $3, delivery_guy_id = $4, status = $5, payment_type = $6, updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
-      [newTracking, newAddress, newAmount, newDriverId, newStatus, newPaymentType, id]
+       SET tracking_number = $1, client_address = $2, latitude = $3, longitude = $4, order_amount = $5, delivery_guy_id = $6, status = $7, payment_type = $8, updated_at = NOW()
+       WHERE id = $9 RETURNING *`,
+      [newTracking, newAddress, isNaN(newLat) ? null : newLat, isNaN(newLng) ? null : newLng, newAmount, newDriverId || null, newStatus, newPaymentType, id]
     );
 
     await db.query(
@@ -130,12 +138,31 @@ exports.deleteOrder = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    const orderRes = await db.query(
+      `SELECT o.*,
+        (SELECT COUNT(*) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed') as confirmed_payment_count
+       FROM orders o WHERE o.id = $1`,
+      [id]
+    );
     if (orderRes.rows.length === 0) {
       return res.status(404).json({ error: 'Order not found.' });
     }
 
+    const order = orderRes.rows[0];
+
+    // Block deletion if any payment has already been confirmed by Finance
+    if (parseInt(order.confirmed_payment_count) > 0) {
+      return res.status(400).json({
+        error: `Cannot delete order #${order.tracking_number}: it has ${order.confirmed_payment_count} confirmed payment(s). Contact Finance to resolve first.`
+      });
+    }
+
+    // Cascade-delete related records first
     await db.query('DELETE FROM order_status_history WHERE order_id = $1', [id]);
+    await db.query('DELETE FROM order_payments WHERE order_id = $1', [id]);
+    await db.query('DELETE FROM pocket_expenses WHERE order_id = $1', [id]);
+    await db.query('DELETE FROM returns WHERE order_id = $1', [id]);
+    await db.query('DELETE FROM order_attachments WHERE order_id = $1', [id]);
     await db.query('DELETE FROM orders WHERE id = $1', [id]);
 
     res.json({ message: 'Order deleted successfully.' });
@@ -344,14 +371,16 @@ exports.updateDeliveryStatus = async (req, res) => {
     let outcomeObj = null;
     if (outcome_key) {
       outcomeObj = getOutcomeByKey(outcome_key);
+    } else if (inputDeliveryOutcome && getOutcomeByKey(inputDeliveryOutcome)?.key === inputDeliveryOutcome) {
+      outcomeObj = getOutcomeByKey(inputDeliveryOutcome);
     } else if (inputDeliveryOutcome && inputCollectionOutcome) {
       outcomeObj = findOutcome(inputDeliveryOutcome, inputCollectionOutcome);
     }
 
-    let status = inputStatus;
-    if (!status && outcomeObj) {
-      status = outcomeObj.status;
-    }
+    const normStatus = (inputStatus || '').toString().trim().toLowerCase();
+    let status = normStatus || (outcomeObj ? outcomeObj.status : '');
+
+    // Default status to 'in_transit' if no status provided but delivery_outcome is given, otherwise 'delivered'
     if (!status) {
       status = 'delivered';
     }
@@ -376,36 +405,101 @@ exports.updateDeliveryStatus = async (req, res) => {
     const order     = orderRes.rows[0];
     const oldStatus = order.status;
 
-    // Enforce sequential status flow
-    const validPredecessors = VALID_PREDECESSORS[status];
-    if (validPredecessors && !validPredecessors.includes(oldStatus)) {
-      await client.query('ROLLBACK');
-      client.release();
-      return res.status(400).json({
-        error: `Cannot transition order from '${oldStatus}' to '${status}'. Expected current status: ${validPredecessors.join(' or ')}.`
-      });
-    }
-
-    // Verify the order belongs to this delivery guy
+    // Verify the order belongs to this delivery guy FIRST (before status checks)
     if (order.delivery_guy_id !== req.user.id) {
       await client.query('ROLLBACK');
       client.release();
       return res.status(403).json({ error: 'This order is not assigned to you.' });
     }
 
-    const deliveryOutcome   = outcomeObj ? outcomeObj.delivery_outcome : inputDeliveryOutcome;
-    const collectionOutcome = outcomeObj ? outcomeObj.collection_outcome : inputCollectionOutcome;
+    // Enforce sequential status flow
+    const validPredecessors = VALID_PREDECESSORS[status];
+    if (validPredecessors && !validPredecessors.includes(oldStatus)) {
+      await client.query('ROLLBACK');
+      client.release();
+      if (['assigned', 'notified_inventory', 'created'].includes(oldStatus) && ['delivered', 'delivery_failed'].includes(status)) {
+        return res.status(400).json({
+          error: `Cannot complete order #${order.tracking_number}: package has not been handed over by warehouse inventory yet (Current status: '${oldStatus}'). Warehouse handoff must be confirmed first.`
+        });
+      }
+      return res.status(400).json({
+        error: `Cannot transition order from '${oldStatus}' to '${status}'. Expected current status: ${validPredecessors.join(' or ')}.`
+      });
+    }
+
+    // Handle in_transit transition immediately without outcome requirement
+    if (status === 'in_transit') {
+      const updateRes = await client.query(
+        `UPDATE orders SET status = 'in_transit', updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [order_id]
+      );
+      const updatedOrder = updateRes.rows[0];
+
+      await client.query(
+        `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+         VALUES ($1, $2, 'in_transit', $3, 'Driver started transit')`,
+        [order_id, oldStatus, req.user.id]
+      );
+
+      await client.query('COMMIT');
+      client.release();
+
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('status_changed', { order_id, oldStatus, newStatus: 'in_transit' });
+      }
+
+      return res.json({
+        message: 'Delivery status updated to in_transit',
+        order: updatedOrder
+      });
+    }
+
+    let deliveryOutcome   = outcomeObj ? outcomeObj.delivery_outcome : inputDeliveryOutcome;
+    let collectionOutcome = outcomeObj ? outcomeObj.collection_outcome : inputCollectionOutcome;
 
     const validDeliveryOutcomes = ['full', 'partial', 'none', 'shipped_3rd_party', 'not_shipped'];
     const validCollectionOutcomes = ['full', 'partial', 'none', 'shipping_fee_only', 'cash_full', 'cash_partial', 'transfer_full', 'transfer_partial'];
 
+    // Auto-normalize if inputDeliveryOutcome is composite key (e.g. 'full_cash_full')
+    if (deliveryOutcome && !validDeliveryOutcomes.includes(deliveryOutcome)) {
+      const matchObj = getOutcomeByKey(deliveryOutcome);
+      if (matchObj && matchObj.delivery_outcome && validDeliveryOutcomes.includes(matchObj.delivery_outcome)) {
+        deliveryOutcome = matchObj.delivery_outcome;
+        collectionOutcome = collectionOutcome || matchObj.collection_outcome;
+      }
+    }
+
     if (!deliveryOutcome || !validDeliveryOutcomes.includes(deliveryOutcome)) {
+      if (status === 'delivered') {
+        deliveryOutcome = 'full';
+        collectionOutcome = collectionOutcome || (cash_amount || payment_amount ? 'cash_full' : 'full');
+      } else if (status === 'delivery_failed' || status === 'returned_to_company') {
+        deliveryOutcome = 'none';
+        collectionOutcome = collectionOutcome || 'none';
+      } else {
+        deliveryOutcome = 'full';
+        collectionOutcome = collectionOutcome || 'full';
+      }
+    }
+
+    if (!collectionOutcome || !validCollectionOutcomes.includes(collectionOutcome)) {
+      if (collectionOutcome === 'cash') collectionOutcome = 'cash_full';
+      else if (collectionOutcome === 'transfer') collectionOutcome = 'transfer_full';
+      else collectionOutcome = (cash_amount || payment_amount ? 'cash_full' : (status === 'delivery_failed' ? 'none' : 'full'));
+    }
+
+    if (!deliveryOutcome || !validDeliveryOutcomes.includes(deliveryOutcome)) {
+      await client.query('ROLLBACK');
+      client.release();
       return res.status(400).json({
         error: `delivery_outcome is required and must be one of: ${validDeliveryOutcomes.join(', ')}`
       });
     }
 
     if (!collectionOutcome || !validCollectionOutcomes.includes(collectionOutcome)) {
+      await client.query('ROLLBACK');
+      client.release();
       return res.status(400).json({
         error: `collection_outcome is required and must be one of: ${validCollectionOutcomes.join(', ')}`
       });
@@ -440,7 +534,7 @@ exports.updateDeliveryStatus = async (req, res) => {
     } else if (collectionOutcome === 'cash_partial' || collectionOutcome === 'transfer_partial') {
       paymentToRecord = delAmount > 0 ? delAmount : orderTotalAmount;
     } else if (collectionOutcome === 'shipping_fee_only') {
-      paymentToRecord = 50.00; // default shipping fee
+      paymentToRecord = parseFloat(req.body.shipping_fee || order.shipping_fee || process.env.DEFAULT_SHIPPING_FEE || 50.00);
     }
 
     let pMethod = payment_method || (outcomeObj ? outcomeObj.payment_method : 'cash');
@@ -551,11 +645,18 @@ exports.getDeliveryGuyOrders = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT o.*, s.name as supervisor_name,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00) as confirmed_paid,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'pending_finance_review'), 0.00) as pending_paid,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00)) as outstanding_balance
+              COALESCE(p.confirmed_paid, 0.00) as confirmed_paid,
+              COALESCE(p.pending_paid, 0.00) as pending_paid,
+              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance
        FROM orders o
        LEFT JOIN users s ON o.supervisor_id = s.id
+       LEFT JOIN (
+         SELECT order_id,
+                SUM(CASE WHEN confirmation_status = 'confirmed' THEN amount ELSE 0 END) as confirmed_paid,
+                SUM(CASE WHEN confirmation_status = 'pending_finance_review' THEN amount ELSE 0 END) as pending_paid
+         FROM order_payments
+         GROUP BY order_id
+       ) p ON p.order_id = o.id
        WHERE o.delivery_guy_id = $1
        ORDER BY o.created_at DESC`,
       [req.user.id]
@@ -572,12 +673,19 @@ exports.getInventoryQueue = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT o.*, s.name as supervisor_name, d.name as delivery_guy_name, d.online_status as delivery_guy_status,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00) as confirmed_paid,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'pending_finance_review'), 0.00) as pending_paid,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00)) as outstanding_balance
+              COALESCE(p.confirmed_paid, 0.00) as confirmed_paid,
+              COALESCE(p.pending_paid, 0.00) as pending_paid,
+              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance
        FROM orders o
        LEFT JOIN users s ON o.supervisor_id = s.id
        LEFT JOIN users d ON o.delivery_guy_id = d.id
+       LEFT JOIN (
+         SELECT order_id,
+                SUM(CASE WHEN confirmation_status = 'confirmed' THEN amount ELSE 0 END) as confirmed_paid,
+                SUM(CASE WHEN confirmation_status = 'pending_finance_review' THEN amount ELSE 0 END) as pending_paid
+         FROM order_payments
+         GROUP BY order_id
+       ) p ON p.order_id = o.id
        ORDER BY o.updated_at DESC`
     );
     res.json(result.rows);
@@ -595,13 +703,20 @@ exports.getAllOrders = async (req, res) => {
               s.name as supervisor_name,
               d.name as delivery_guy_name, d.online_status as delivery_guy_status,
               h.name as inventory_handed_by_name,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00) as confirmed_paid,
-              COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'pending_finance_review'), 0.00) as pending_paid,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE((SELECT SUM(amount) FROM order_payments WHERE order_id = o.id AND confirmation_status = 'confirmed'), 0.00)) as outstanding_balance
+              COALESCE(p.confirmed_paid, 0.00) as confirmed_paid,
+              COALESCE(p.pending_paid, 0.00) as pending_paid,
+              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance
        FROM orders o
        LEFT JOIN users s ON o.supervisor_id = s.id
        LEFT JOIN users d ON o.delivery_guy_id = d.id
        LEFT JOIN users h ON o.inventory_handoff_by = h.id
+       LEFT JOIN (
+         SELECT order_id,
+                SUM(CASE WHEN confirmation_status = 'confirmed' THEN amount ELSE 0 END) as confirmed_paid,
+                SUM(CASE WHEN confirmation_status = 'pending_finance_review' THEN amount ELSE 0 END) as pending_paid
+         FROM order_payments
+         GROUP BY order_id
+       ) p ON p.order_id = o.id
        ORDER BY o.created_at DESC`
     );
     res.json(result.rows);
@@ -659,6 +774,11 @@ exports.recordPayment = async (req, res) => {
     }
 
     let attachmentId = proof_attachment_id || null;
+
+    const isEPayment = ['e_wallet', 'instapay', 'vodafone_cash'].includes(pMethod);
+    if (isEPayment && !attachmentId && !req.body.image) {
+      return res.status(400).json({ error: `Proof image or attachment is required for electronic payment method '${pMethod}'.` });
+    }
 
     // Handle e-payment proof image upload if image string provided
     if (req.body.image && !attachmentId) {

@@ -33,8 +33,14 @@ exports.clockIn = async (req, res) => {
     const numLat = parseFloat(lat);
     const numLng = parseFloat(lng);
 
-    // Geofence Distance Calculation (Bypassed for free testing)
+    // Geofence Distance Calculation & Enforcement
     const distanceMeters = calculateDistanceMeters(numLat, numLng, WAREHOUSE_LAT, WAREHOUSE_LNG);
+
+    if (distanceMeters > WAREHOUSE_RADIUS_METERS && process.env.SKIP_GEOFENCE !== 'true') {
+      return res.status(400).json({
+        error: `Clock-in rejected: You are ${distanceMeters}m away from the warehouse (maximum allowed radius is ${WAREHOUSE_RADIUS_METERS}m).`
+      });
+    }
 
     // Close any previous stale open shifts for safety
     await db.query(
@@ -128,70 +134,100 @@ exports.clockOut = async (req, res) => {
 };
 
 // Read-only Worked Hours Summary (Supervisor / Manager)
+// Calculates daily working hours (resets daily at 00:00) & monthly accumulated hours (resets monthly on 1st at 00:00)
 exports.getShiftSummary = async (req, res) => {
   try {
     const { driver_id } = req.params;
 
-    let queryStr = `
-      SELECT s.*, u.name as driver_name, u.online_status
-      FROM driver_shifts s
-      JOIN users u ON s.delivery_guy_id = u.id
-      WHERE s.clock_in_at >= CURRENT_DATE
-    `;
-
-    const queryParams = [];
+    // 1. Fetch all delivery drivers
+    let driverQuery = `SELECT id, name, username, online_status FROM users WHERE role = 'delivery_guy'`;
+    const driverParams = [];
     if (driver_id) {
-      queryStr += ' AND s.delivery_guy_id = $1';
-      queryParams.push(driver_id);
+      driverQuery += ` AND id = $1`;
+      driverParams.push(driver_id);
     }
+    const driverRes = await db.query(driverQuery, driverParams);
 
-    queryStr += ' ORDER BY s.clock_in_at DESC';
+    // 2. Fetch shifts starting from 1st of current month
+    let shiftQuery = `
+      SELECT s.*
+      FROM driver_shifts s
+      WHERE s.clock_in_at >= DATE_TRUNC('month', CURRENT_DATE)
+    `;
+    const shiftParams = [];
+    if (driver_id) {
+      shiftQuery += ` AND s.delivery_guy_id = $1`;
+      shiftParams.push(driver_id);
+    }
+    shiftQuery += ` ORDER BY s.clock_in_at DESC`;
 
-    const result = await db.query(queryStr, queryParams);
+    const shiftRes = await db.query(shiftQuery, shiftParams);
 
-    // Group by driver and compute duration
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    // Map drivers
     const driverSummaries = {};
+    driverRes.rows.forEach(d => {
+      driverSummaries[d.id] = {
+        driver_id: d.id,
+        driver_name: d.name,
+        username: d.username,
+        online_status: d.online_status,
+        daily_seconds: 0,
+        monthly_seconds: 0,
+        completed_shifts_today: 0,
+        completed_shifts_month: 0,
+        has_active_shift: false,
+        active_shift_seconds: 0,
+        today_shifts: [],
+        month_shifts_count: 0
+      };
+    });
 
-    result.rows.forEach(shift => {
+    shiftRes.rows.forEach(shift => {
       const dId = shift.delivery_guy_id;
-      if (!driverSummaries[dId]) {
-        driverSummaries[dId] = {
-          driver_id: dId,
-          driver_name: shift.driver_name,
-          online_status: shift.online_status,
-          total_seconds_today: 0,
-          completed_shifts_count: 0,
-          has_active_shift: false,
-          active_shift_seconds: 0,
-          shifts: []
-        };
-      }
+      if (!driverSummaries[dId]) return;
 
       const clockInTime = new Date(shift.clock_in_at).getTime();
       const clockOutTime = shift.clock_out_at ? new Date(shift.clock_out_at).getTime() : Date.now();
       const durationSeconds = Math.max(0, Math.floor((clockOutTime - clockInTime) / 1000));
 
-      driverSummaries[dId].total_seconds_today += durationSeconds;
-      if (shift.clock_out_at) {
-        driverSummaries[dId].completed_shifts_count += 1;
-      } else {
-        driverSummaries[dId].has_active_shift = true;
-        driverSummaries[dId].active_shift_seconds = durationSeconds;
+      if (clockInTime >= startOfMonth) {
+        driverSummaries[dId].monthly_seconds += durationSeconds;
+        driverSummaries[dId].month_shifts_count += 1;
+        if (shift.clock_out_at) {
+          driverSummaries[dId].completed_shifts_month += 1;
+        }
       }
 
-      driverSummaries[dId].shifts.push({
-        id: shift.id,
-        clock_in_at: shift.clock_in_at,
-        clock_out_at: shift.clock_out_at,
-        clock_in_lat: shift.clock_in_lat,
-        clock_in_lng: shift.clock_in_lng,
-        duration_minutes: (durationSeconds / 60).toFixed(1)
-      });
+      if (clockInTime >= startOfToday) {
+        driverSummaries[dId].daily_seconds += durationSeconds;
+        if (shift.clock_out_at) {
+          driverSummaries[dId].completed_shifts_today += 1;
+        } else {
+          driverSummaries[dId].has_active_shift = true;
+          driverSummaries[dId].active_shift_seconds = durationSeconds;
+        }
+
+        driverSummaries[dId].today_shifts.push({
+          id: shift.id,
+          clock_in_at: shift.clock_in_at,
+          clock_out_at: shift.clock_out_at,
+          clock_in_lat: shift.clock_in_lat,
+          clock_in_lng: shift.clock_in_lng,
+          duration_minutes: (durationSeconds / 60).toFixed(1)
+        });
+      }
     });
 
     const summaryList = Object.values(driverSummaries).map(ds => ({
       ...ds,
-      total_hours_today: (ds.total_seconds_today / 3600).toFixed(2),
+      daily_hours: (ds.daily_seconds / 3600).toFixed(2),
+      monthly_hours: (ds.monthly_seconds / 3600).toFixed(2),
+      total_hours_today: (ds.daily_seconds / 3600).toFixed(2),
+      total_hours_month: (ds.monthly_seconds / 3600).toFixed(2),
       active_shift_hours: (ds.active_shift_seconds / 3600).toFixed(2)
     }));
 
@@ -207,7 +243,6 @@ exports.updateLocation = async (req, res) => {
   try {
     const inputLat = req.body.lat !== undefined ? req.body.lat : req.body.latitude;
     const inputLng = req.body.lng !== undefined ? req.body.lng : req.body.longitude;
-    const speed = req.body.speed;
     const driverId = req.user.id;
 
     if (inputLat === undefined || inputLng === undefined || inputLat === null || inputLng === null) {
@@ -216,10 +251,7 @@ exports.updateLocation = async (req, res) => {
 
     const lat = parseFloat(inputLat);
     const lng = parseFloat(inputLng);
-
-    const numLat = parseFloat(lat);
-    const numLng = parseFloat(lng);
-    const numSpeed = parseFloat(speed || 0);
+    const speed = parseFloat(req.body.speed || 0);
 
     const now = new Date().toISOString();
 
@@ -241,16 +273,16 @@ exports.updateLocation = async (req, res) => {
       io.emit('driver_location_updated', {
         delivery_guy_id: driverId,
         driver_name: req.user.name,
-        lat: numLat,
-        lng: numLng,
-        speed: numSpeed,
+        lat,
+        lng,
+        speed,
         updated_at: now
       });
     }
 
     res.json({
       message: 'Location update recorded.',
-      location: { lat: numLat, lng: numLng, speed: numSpeed, updated_at: now }
+      location: { lat, lng, speed, updated_at: now }
     });
   } catch (err) {
     console.error('Error updating driver location:', err);

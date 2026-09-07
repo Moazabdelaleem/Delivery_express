@@ -15,8 +15,8 @@ async function runMigrations() {
     await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_items_amount NUMERIC(10,2) DEFAULT 0.00;');
     await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS returned_items_amount NUMERIC(10,2) DEFAULT 0.00;');
     await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS returned_quantity INT DEFAULT 0;');
-    await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_notes TEXT;');
-    await db.query('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
+    await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;');
+    await db.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;');
     await db.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tracking_number_unique ON orders (tracking_number);');
     // Schema cleanup: drop redundant legacy columns
     await db.query('ALTER TABLE orders DROP COLUMN IF EXISTS cash_collected;');

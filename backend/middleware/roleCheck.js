@@ -11,18 +11,13 @@ const roleCheck = (allowedRoles = []) => {
 
     const { role } = req.user;
 
-    // Manager Guard: Manager role has read-only access across standard business operations, 
-    // BUT is authorized for Executive Manager Account Approvals and System Clean Wipe.
+    // Manager Guard: Manager role has read-only access across GET endpoints,
+    // and mutation access for endpoints where 'manager' is explicitly listed in allowedRoles.
     if (role === 'manager') {
-      const isManagerAdminAction = req.path.includes('/approve-user') || 
-                                   req.path.includes('/approve-manager') || 
-                                   req.path.includes('/reject-user') || 
-                                   req.path.includes('/reject-manager') || 
-                                   req.path.includes('/seed/clean');
-      if (req.method !== 'GET' && !isManagerAdminAction) {
-
-        return res.status(403).json({ 
-          error: 'Access Forbidden: The Manager role has READ-ONLY permissions and cannot perform edit or create actions.' 
+      const isExplicitlyAllowed = allowedRoles.length > 0 && allowedRoles.includes('manager');
+      if (req.method !== 'GET' && !isExplicitlyAllowed) {
+        return res.status(403).json({
+          error: 'Access Forbidden: The Manager role has READ-ONLY permissions and cannot perform edit or create actions.'
         });
       }
       return next();

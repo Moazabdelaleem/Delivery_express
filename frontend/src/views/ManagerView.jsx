@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger } from '../api.js';
+import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger, getShiftSummary } from '../api.js';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
 
@@ -7,6 +7,7 @@ export default function ManagerView({ token }) {
   const [orders, setOrders]       = useState([]);
   const [wallets, setWallets]     = useState([]);
   const [pending, setPending]     = useState([]);
+  const [shiftSummaries, setShiftSummaries] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
   const [submitting, setSub]      = useState({});
@@ -18,14 +19,16 @@ export default function ManagerView({ token }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [ord, wal, pend] = await Promise.all([
+      const [ord, wal, pend, shSummary] = await Promise.all([
         getAllOrders(token),
         getAllWallets(token),
         getPendingUsers(token),
+        getShiftSummary(null, token).catch(() => ({ summaries: [] }))
       ]);
       setOrders(ord);
       setWallets(Array.isArray(wal) ? wal : []);
       setPending(pend);
+      setShiftSummaries(shSummary.summaries || []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
     } finally {
@@ -195,18 +198,35 @@ export default function ManagerView({ token }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Driver</th><th>Status</th><th>Collection Cash</th><th>Pocket Balance</th><th>Total Spent</th></tr>
+                <tr>
+                  <th>Driver</th>
+                  <th>Status</th>
+                  <th>Collection Cash</th>
+                  <th>Pocket Balance</th>
+                  <th>Total Spent</th>
+                  <th>⏱️ Worked Today (Daily)</th>
+                  <th>📅 Worked Month (Accumulated)</th>
+                </tr>
               </thead>
               <tbody>
-                {wallets.map(w => (
-                  <tr key={w.id}>
-                    <td style={{ fontWeight: 600 }}>{w.name}</td>
-                    <td><span className={`badge badge-${w.online_status}`}>{w.online_status}</span></td>
-                    <td className="amount amount-positive">EGP {parseFloat(w.collection_balance || 0).toFixed(2)}</td>
-                    <td className="amount" onClick={() => handleOpenLedger(w)} style={{ cursor: 'pointer', textDecoration: 'underline' }} title="Click to view ledger history">EGP {parseFloat(w.pocket_balance || 0).toFixed(2)}</td>
-                    <td style={{ color: 'var(--clr-warning)' }}>EGP {parseFloat(w.total_spent || 0).toFixed(2)}</td>
-                  </tr>
-                ))}
+                {wallets.map(w => {
+                  const sh = shiftSummaries.find(s => String(s.driver_id) === String(w.id || w.delivery_guy_id));
+                  return (
+                    <tr key={w.id}>
+                      <td style={{ fontWeight: 600 }}>{w.name}</td>
+                      <td><span className={`badge badge-${w.online_status}`}>{w.online_status}</span></td>
+                      <td className="amount amount-positive">EGP {parseFloat(w.collection_balance || 0).toFixed(2)}</td>
+                      <td className="amount" onClick={() => handleOpenLedger(w)} style={{ cursor: 'pointer', textDecoration: 'underline' }} title="Click to view ledger history">EGP {parseFloat(w.pocket_balance || 0).toFixed(2)}</td>
+                      <td style={{ color: 'var(--clr-warning)' }}>EGP {parseFloat(w.total_spent || 0).toFixed(2)}</td>
+                      <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>
+                        ⏱️ {sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00'} hrs
+                      </td>
+                      <td style={{ fontWeight: 700, color: 'var(--clr-purple)' }}>
+                        📅 {sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00'} hrs
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

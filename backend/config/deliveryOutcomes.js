@@ -46,7 +46,8 @@ function getValidCollectionOutcomes(deliveryOutcome) {
 }
 
 function getOutcomeByKey(key) {
-  return DELIVERY_OUTCOMES.find(o => o.key === key) || DELIVERY_OUTCOMES[0];
+  if (!key) return null;
+  return DELIVERY_OUTCOMES.find(o => o.key === key) || null;
 }
 
 function findOutcome(deliveryOutcome, collectionOutcome) {
