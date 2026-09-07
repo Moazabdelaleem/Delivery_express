@@ -272,8 +272,9 @@ exports.financeTopUpPocketMoney = async (req, res) => {
     if (io) {
       const payloadUpdated = { delivery_guy_id, type: 'topup', amount: topUpAmount };
       const payloadTopup = { delivery_guy_id, amount: topUpAmount };
-      io.emit('wallet_updated', payloadUpdated);
-      io.emit('pocket_topup', payloadTopup);
+      // Targeted: wallet events only go to the specific driver + finance/manager roles
+      io.to(`user_${delivery_guy_id}`).to('role_finance').to('role_manager').emit('wallet_updated', payloadUpdated);
+      io.to(`user_${delivery_guy_id}`).to('role_finance').emit('pocket_topup', payloadTopup);
       if (bufferEvent) {
         bufferEvent(delivery_guy_id, 'wallet_updated', payloadUpdated);
         bufferEvent(delivery_guy_id, 'pocket_topup', payloadTopup);
@@ -369,8 +370,9 @@ exports.recordPocketExpense = async (req, res) => {
     if (io) {
       const payloadUpdated = { delivery_guy_id: req.user.id, type: 'expense', amount: expenseAmount };
       const payloadExpense = { delivery_guy_id: req.user.id, amount: expenseAmount };
-      io.emit('wallet_updated', payloadUpdated);
-      io.emit('pocket_expense_logged', payloadExpense);
+      // Targeted: expense events only go to the specific driver + finance/manager roles
+      io.to(`user_${req.user.id}`).to('role_finance').to('role_manager').emit('wallet_updated', payloadUpdated);
+      io.to(`user_${req.user.id}`).to('role_finance').emit('pocket_expense_logged', payloadExpense);
       if (bufferEvent) {
         bufferEvent(req.user.id, 'wallet_updated', payloadUpdated);
         bufferEvent(req.user.id, 'pocket_expense_logged', payloadExpense);

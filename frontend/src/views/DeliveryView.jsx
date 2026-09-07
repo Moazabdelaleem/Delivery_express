@@ -62,7 +62,15 @@ export default function DeliveryView({ token, user }) {
   useEffect(() => {
     fetchData();
     const iv = setInterval(fetchData, 20000);
-    return () => clearInterval(iv);
+    // C1: Pause polling when tab is hidden to save bandwidth
+    const handleVisibility = () => {
+      if (!document.hidden) fetchData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchData]);
 
   const toggleStatus = async () => {
@@ -191,8 +199,12 @@ export default function DeliveryView({ token, user }) {
     try {
       const targetOrder = outcomeModal;
       const finalStatus = ['full', 'partial'].includes(step1Outcome) ? 'delivered' : 'delivery_failed';
-      await updateDeliveryStatus(targetOrder.id, { status: finalStatus, ...payload }, token);
+      const result = await updateDeliveryStatus(targetOrder.id, { status: finalStatus, ...payload }, token);
       toast.success(`Order status updated successfully.`);
+      // H2: Optimistic update — reflect new status immediately in the list
+      if (result?.order) {
+        setOrders(prev => prev.map(o => o.id === targetOrder.id ? { ...o, ...result.order } : o));
+      }
       setOutcomeModal(null);
       setDelItemAmt(''); setRetItemAmt(''); setRetQty(''); setRetNotes('');
       fetchData();
@@ -225,7 +237,42 @@ export default function DeliveryView({ token, user }) {
     setFailModal(null); setFailReason('');
   };
 
-  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading your dashboard…</p></div>;
+  if (loading) return (
+    <div style={{ padding: '28px 24px' }}>
+      <div className="section-header">
+        <div>
+          <div className="skeleton-title" style={{ marginBottom: 8 }} />
+          <div className="skeleton-line" style={{ width: 200 }} />
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div className="skeleton-line" style={{ width: 100, height: 36, borderRadius: 'var(--r-md)' }} />
+          <div className="skeleton-line" style={{ width: 100, height: 36, borderRadius: 'var(--r-md)' }} />
+        </div>
+      </div>
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: 24 }}>
+        {[1,2].map(i => (
+          <div key={i} className="skeleton-stat-card">
+            <div className="skeleton-label" />
+            <div className="skeleton-value" />
+            <div className="skeleton-line" style={{ width: '60%' }} />
+          </div>
+        ))}
+      </div>
+      <div className="card-grid">
+        {[1,2,3].map(i => (
+          <div key={i} className="skeleton-card">
+            <div className="skeleton-header">
+              <div className="skeleton-title" style={{ width: '40%' }} />
+              <div className="skeleton-line" style={{ width: 60, height: 22, borderRadius: 999 }} />
+            </div>
+            <div className="skeleton-line" />
+            <div className="skeleton-line" style={{ width: '80%' }} />
+            <div className="skeleton-line" style={{ width: '60%' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const todayStr = new Date().toDateString();
   const active = orders.filter(o => !TERMINAL.includes(o.status) && o.status !== 'cash_cleared');

@@ -117,14 +117,16 @@ exports.confirmPayment = async (req, res) => {
     const targetDriverId = payment.delivery_guy_id || payment.recorded_by;
     if (io) {
       const confirmPayload = { payment_id, order_id: payment.order_id };
-      io.emit('payment_confirmed', confirmPayload);
+      // Targeted: notify the specific driver + finance/manager roles
+      io.to('role_finance').to('role_manager').emit('payment_confirmed', confirmPayload);
+      if (targetDriverId) io.to(`user_${targetDriverId}`).emit('payment_confirmed', confirmPayload);
       if (bufferEvent && targetDriverId) {
         bufferEvent(targetDriverId, 'payment_confirmed', confirmPayload);
       }
 
       if (payment.payment_method === 'cash') {
         const walletPayload = { delivery_guy_id: targetDriverId };
-        io.emit('wallet_updated', walletPayload);
+        if (targetDriverId) io.to(`user_${targetDriverId}`).to('role_finance').emit('wallet_updated', walletPayload);
         if (bufferEvent && targetDriverId) {
           bufferEvent(targetDriverId, 'wallet_updated', walletPayload);
         }
@@ -204,7 +206,9 @@ exports.rejectPayment = async (req, res) => {
     const targetDriverId = payment.recorded_by;
     if (io) {
       const rejectPayload = { payment_id, order_id: payment.order_id };
-      io.emit('payment_rejected', rejectPayload);
+      // Targeted: notify the specific driver + finance/manager roles
+      io.to('role_finance').to('role_manager').emit('payment_rejected', rejectPayload);
+      if (targetDriverId) io.to(`user_${targetDriverId}`).emit('payment_rejected', rejectPayload);
       if (bufferEvent && targetDriverId) {
         bufferEvent(targetDriverId, 'payment_rejected', rejectPayload);
       }

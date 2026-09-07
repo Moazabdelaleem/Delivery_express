@@ -56,7 +56,19 @@ export default function SupervisorView({ token, user }) {
   useEffect(() => {
     fetchData();
     const iv = setInterval(fetchData, 20000);
-    return () => clearInterval(iv);
+    // C1: Pause polling when tab is hidden to save bandwidth
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(iv);
+      } else {
+        fetchData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchData]);
 
   const handleOpenDetails = (type) => {
@@ -129,12 +141,16 @@ export default function SupervisorView({ token, user }) {
   const handleDeleteOrder = async () => {
     if (!deleteModal || deleting) return;
     setDeleting(true);
+    // H2: Optimistic removal — remove from list immediately
+    setOrders(prev => prev.filter(o => o.id !== deleteModal.id));
     try {
       await deleteOrder(deleteModal.id, token);
       toast.success(`Order #${deleteModal.tracking_number} deleted successfully.`);
       setDeleteModal(null);
       fetchData();
     } catch (err) {
+      // Rollback optimistic update on failure
+      fetchData();
       toast.error(err.message);
     } finally {
       setDeleting(false);
@@ -167,7 +183,29 @@ export default function SupervisorView({ token, user }) {
     return acc;
   }, {});
 
-  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading orders…</p></div>;
+  if (loading) return (
+    <div style={{ padding: '28px 24px' }}>
+      <div className="section-header">
+        <div>
+          <div className="skeleton-title" style={{ marginBottom: 8 }} />
+          <div className="skeleton-line" style={{ width: 220 }} />
+        </div>
+        <div className="skeleton-line" style={{ width: 100, height: 36, borderRadius: 'var(--r-md)' }} />
+      </div>
+      <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', marginBottom: 24 }}>
+        {[1,2,3,4,5,6].map(i => (
+          <div key={i} className="skeleton-stat-card">
+            <div className="skeleton-label" />
+            <div className="skeleton-value" />
+          </div>
+        ))}
+      </div>
+      <div className="skeleton-table-wrap">
+        <div className="skeleton-thead" />
+        {[1,2,3,4,5].map(i => <div key={i} className="skeleton-row" />)}
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -183,29 +221,29 @@ export default function SupervisorView({ token, user }) {
 
       {/* Stats */}
       <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
-        <div className="stat-card" onClick={() => handleOpenDetails('all_orders')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('all_orders')} title="Click for details">
           <div className="stat-label">📋 Total Orders</div>
           <div className="stat-value">{orders.length}</div>
         </div>
-        <div className="stat-card" onClick={() => handleOpenDetails('in_transit')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('in_transit')} title="Click for details">
           <div className="stat-label">🚚 In Transit</div>
           <div className="stat-value" style={{ color: 'var(--clr-purple)' }}>{counts.in_transit || 0}</div>
         </div>
-        <div className="stat-card" onClick={() => handleOpenDetails('delivered')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('delivered')} title="Click for details">
           <div className="stat-label">✅ Delivered</div>
           <div className="stat-value" style={{ color: 'var(--clr-success)' }}>{counts.delivered || 0}</div>
         </div>
-        <div className="stat-card" onClick={() => handleOpenDetails('cash_cleared')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('cash_cleared')} title="Click for details">
           <div className="stat-label">💵 Cash Cleared</div>
           <div className="stat-value" style={{ color: 'var(--clr-accent)' }}>{counts.cash_cleared || 0}</div>
         </div>
-        <div className="stat-card" onClick={() => handleOpenDetails('failed_returned')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('failed_returned')} title="Click for details">
           <div className="stat-label">⚠️ Failed/Returned</div>
           <div className="stat-value" style={{ color: 'var(--clr-danger)' }}>
             {(counts.delivery_failed || 0) + (counts.returned_to_company || 0)}
           </div>
         </div>
-        <div className="stat-card" onClick={() => handleOpenDetails('drivers')} style={{ cursor: 'pointer' }} title="Click for details">
+        <div className="stat-card stat-card-clickable" onClick={() => handleOpenDetails('drivers')} title="Click for details">
           <div className="stat-label">👥 Drivers Status</div>
           <div className="stat-value" style={{ color: 'var(--clr-text)' }}>
             {drivers.filter(d => d.online_status === 'online').length}/{drivers.length}

@@ -87,7 +87,12 @@ function ToastContainer() {
   return (
     <div className="toast-container">
       {toasts.map(t => (
-        <div key={t.id} className={`toast toast-${t.type}`}>
+        <div
+          key={t.id}
+          className={`toast toast-${t.type}`}
+          role="alert"
+          style={{ '--toast-duration': t.type === 'error' ? '8s' : '4s' }}
+        >
           <div className="toast-icon-badge">
             {icons[t.type]}
           </div>

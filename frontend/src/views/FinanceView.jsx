@@ -42,7 +42,15 @@ export default function FinanceView({ token }) {
   useEffect(() => {
     fetchData();
     const iv = setInterval(fetchData, 20000);
-    return () => clearInterval(iv);
+    // C1: Pause polling when tab is hidden to save bandwidth
+    const handleVisibility = () => {
+      if (!document.hidden) fetchData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchData]);
 
   const handleConfirmPayment = async (paymentId) => {
@@ -128,7 +136,25 @@ export default function FinanceView({ token }) {
   const totalCollection = wallets.reduce((s, w) => s + parseFloat(w.collection_balance || 0), 0);
   const totalPocket     = wallets.reduce((s, w) => s + parseFloat(w.pocket_balance || 0), 0);
 
-  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading finance data…</p></div>;
+  if (loading) return (
+    <div style={{ padding: '28px 24px' }}>
+      <div className="section-header">
+        <div className="skeleton-title" style={{ width: '40%' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[1,2,3,4].map(i => <div key={i} className="skeleton-line" style={{ width: 80, height: 32, borderRadius: 'var(--r-md)' }} />)}
+        </div>
+      </div>
+      <div className="stat-grid" style={{ marginBottom: 24 }}>
+        {[1,2,3,4].map(i => (
+          <div key={i} className="skeleton-stat-card"><div className="skeleton-label" /><div className="skeleton-value" /></div>
+        ))}
+      </div>
+      <div className="skeleton-table-wrap">
+        <div className="skeleton-thead" />
+        {[1,2,3,4,5].map(i => <div key={i} className="skeleton-row" />)}
+      </div>
+    </div>
+  );
 
   return (
     <div>

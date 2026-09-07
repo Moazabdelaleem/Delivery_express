@@ -63,7 +63,8 @@ exports.createOrder = async (req, res) => {
         delivery_guy_id: newOrder.delivery_guy_id,
         tracking_number: newOrder.tracking_number
       };
-      io.emit('order_assigned', payload);
+      // Targeted: notify specific driver + oversight roles only
+      io.to(`user_${newOrder.delivery_guy_id}`).to('role_supervisor').to('role_manager').emit('order_assigned', payload);
       if (bufferEvent) bufferEvent(newOrder.delivery_guy_id, 'order_assigned', payload);
       sendPushNotification(
         newOrder.delivery_guy_id,
@@ -251,7 +252,8 @@ exports.assignOrder = async (req, res) => {
         delivery_guy_id: updatedOrder.delivery_guy_id,
         tracking_number: updatedOrder.tracking_number
       };
-      io.emit('order_assigned', payload);
+      // Targeted: notify specific driver + oversight roles only
+      io.to(`user_${updatedOrder.delivery_guy_id}`).to('role_supervisor').to('role_manager').emit('order_assigned', payload);
       if (bufferEvent) bufferEvent(updatedOrder.delivery_guy_id, 'order_assigned', payload);
       sendPushNotification(
         updatedOrder.delivery_guy_id,
@@ -323,13 +325,17 @@ exports.inventoryHandoff = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('status_changed', {
+      const statusPayload = {
         order_id,
         oldStatus,
         newStatus,
         delivery_outcome: updatedOrder.delivery_outcome || null,
         collection_outcome: updatedOrder.collection_outcome || null
-      });
+      };
+      // Targeted: driver + supervisor/manager roles only
+      const targetRooms = io.to('role_supervisor').to('role_manager').to('role_inventory');
+      if (updatedOrder.delivery_guy_id) targetRooms.to(`user_${updatedOrder.delivery_guy_id}`);
+      targetRooms.emit('status_changed', statusPayload);
     }
 
     if (updatedOrder.delivery_guy_id) {
@@ -446,7 +452,9 @@ exports.updateDeliveryStatus = async (req, res) => {
 
       const io = req.app.get('io');
       if (io) {
-        io.emit('status_changed', { order_id, oldStatus, newStatus: 'in_transit' });
+        const transitPayload = { order_id, oldStatus, newStatus: 'in_transit' };
+        // Targeted: notify the driver + oversight roles
+        io.to(`user_${req.user.id}`).to('role_supervisor').to('role_manager').emit('status_changed', transitPayload);
       }
 
       return res.json({
@@ -621,8 +629,11 @@ exports.updateDeliveryStatus = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('status_changed', { order_id, oldStatus, newStatus: status, delivery_outcome: deliveryOutcome, collection_outcome: collectionOutcome });
-      io.emit('wallet_updated', { delivery_guy_id: req.user.id });
+      const finalPayload = { order_id, oldStatus, newStatus: status, delivery_outcome: deliveryOutcome, collection_outcome: collectionOutcome };
+      // Targeted: notify the driver who performed delivery + oversight roles
+      io.to(`user_${req.user.id}`).to('role_supervisor').to('role_manager').to('role_finance').emit('status_changed', finalPayload);
+      // Wallet update only relevant to the driver and finance
+      io.to(`user_${req.user.id}`).to('role_finance').emit('wallet_updated', { delivery_guy_id: req.user.id });
     }
 
     res.json({
@@ -819,7 +830,8 @@ exports.recordPayment = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('payment_recorded', { order_id, payment: newPayment });
+      // Payment recorded: notify finance + the driver who submitted it
+      io.to('role_finance').to('role_manager').to(`user_${req.user.id}`).emit('payment_recorded', { order_id, payment: newPayment });
     }
 
     res.status(201).json({

@@ -34,7 +34,15 @@ export default function InventoryView({ token }) {
   useEffect(() => {
     fetchData();
     const iv = setInterval(fetchData, 20000);
-    return () => clearInterval(iv);
+    // C1: Pause polling when tab is hidden to save bandwidth
+    const handleVisibility = () => {
+      if (!document.hidden) fetchData();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [fetchData]);
 
   const openHandoff = (id, handed) => {
@@ -74,7 +82,32 @@ export default function InventoryView({ token }) {
   const pending        = orders.filter(o => HANDOFF_STATUSES.includes(o.status));
   const pendingReturns = returnsList.filter(r => r.status === 'pending_verification' || r.status === 'pending_pickup');
 
-  if (loading) return <div className="loading-screen"><div className="spinner" /><p>Loading warehouse dashboard…</p></div>;
+  if (loading) return (
+    <div style={{ padding: '28px 24px' }}>
+      <div className="section-header">
+        <div className="skeleton-title" style={{ width: '45%' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[1,2].map(i => <div key={i} className="skeleton-line" style={{ width: 100, height: 32, borderRadius: 'var(--r-md)' }} />)}
+        </div>
+      </div>
+      <div className="card-grid">
+        {[1,2,3].map(i => (
+          <div key={i} className="skeleton-card">
+            <div className="skeleton-header">
+              <div className="skeleton-title" style={{ width: '50%' }} />
+              <div className="skeleton-line" style={{ width: 60, height: 20, borderRadius: 999 }} />
+            </div>
+            <div className="skeleton-line" />
+            <div className="skeleton-line" style={{ width: '70%' }} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div className="skeleton-line" style={{ width: 80, height: 32, borderRadius: 'var(--r-md)' }} />
+              <div className="skeleton-line" style={{ width: 80, height: 32, borderRadius: 'var(--r-md)' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div>

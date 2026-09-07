@@ -1,6 +1,7 @@
 // =========================================================
 // api.js — All backend fetch helpers
-// BASE_URL reads from Vite env var (or falls back to localhost)
+// BASE_URL reads from Vite env var (or falls back to /api for Vercel)
+// For local dev, create frontend/.env.local with: VITE_API_URL=http://localhost:5000/api
 // =========================================================
 
 export const BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -11,6 +12,12 @@ const headers = (token) => ({
 });
 
 const handle = async (res) => {
+  // M5: Auto-logout on expired/invalid JWT — prevents confusing error toasts after session expiry
+  if (res.status === 401) {
+    localStorage.removeItem('delivery_express_auth');
+    setTimeout(() => window.location.reload(), 400);
+    throw new Error('Session expired. Please sign in again.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
