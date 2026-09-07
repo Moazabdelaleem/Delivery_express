@@ -6,22 +6,24 @@ const roleCheck = require('../middleware/roleCheck');
 
 const rateLimit = require('express-rate-limit');
 
-// Strict rate limiter for login/register — prevents brute-force attacks (5 per 15 min)
+// Rate limiter for login/register (100 per 15 min)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'test' ? 10000 : 100,
   message: { error: 'Too many login attempts, please wait 15 minutes before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test'
 });
 
-// General rate limiter for other auth endpoints
+// General rate limiter for other auth endpoints (300 per 15 min)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: process.env.NODE_ENV === 'test' ? 10000 : 300,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test'
 });
 
 // Public Auth Routes

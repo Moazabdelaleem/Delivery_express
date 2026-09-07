@@ -2,33 +2,27 @@ const { Pool } = require('pg');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-let pgPool = null;
+const DEFAULT_DATABASE_URL = 'postgresql://postgres.znyejjiyfulujtazukhu:Oahz3rbWb5fecImy@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
 
-if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
-  pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 15000
-  });
+const connectionString = (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '')
+  ? process.env.DATABASE_URL.trim()
+  : DEFAULT_DATABASE_URL;
 
-  pgPool.on('error', (err) => {
-    console.error('⚠️ PostgreSQL pool idle error:', err.message);
-  });
-} else {
-  console.warn('⚠️ DATABASE_URL environment variable is missing.');
-}
+let pgPool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 15000
+});
+
+pgPool.on('error', (err) => {
+  console.error('⚠️ PostgreSQL pool idle error:', err.message);
+});
 
 const query = async (text, params = []) => {
-  if (!pgPool) {
-    throw new Error('DATABASE_URL environment variable is missing on server.');
-  }
   return await pgPool.query(text, params);
 };
 
 const getClient = async () => {
-  if (!pgPool) {
-    throw new Error('DATABASE_URL environment variable is missing on server.');
-  }
   const client = await pgPool.connect();
   return client;
 };

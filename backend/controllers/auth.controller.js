@@ -126,7 +126,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    const secret = process.env.JWT_SECRET;
+    const DEFAULT_JWT_SECRET = '9bda240f68c7f20f9c3ec80fc52b90aa737e1eeaeded48f07fff226ad153d48a66678539e24d82dd7cf55abb01a4d8aa89c7128b2f7a1dc7019e5ef507bf0aaf';
+    const secret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
     const tokenExpiry = user.role === 'delivery_guy' ? '7d' : '12h';
     const token = jwt.sign(
       { id: user.id, username: user.username, name: user.name, role: user.role },

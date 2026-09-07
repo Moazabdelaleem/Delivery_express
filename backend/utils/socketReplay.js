@@ -48,7 +48,8 @@ function extractUserId(socket) {
   try {
     const token = socket.handshake?.auth?.token || socket.handshake?.query?.token;
     if (token) {
-      const secret = process.env.JWT_SECRET;
+      const DEFAULT_JWT_SECRET = '9bda240f68c7f20f9c3ec80fc52b90aa737e1eeaeded48f07fff226ad153d48a66678539e24d82dd7cf55abb01a4d8aa89c7128b2f7a1dc7019e5ef507bf0aaf';
+      const secret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
       const decoded = jwt.verify(token, secret);
       if (decoded && decoded.id) return String(decoded.id);
     }

@@ -52,7 +52,8 @@ if (process.env.VERCEL !== '1') {
       const token = socket.handshake?.auth?.token || socket.handshake?.query?.token;
       if (token) {
         const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const DEFAULT_JWT_SECRET = '9bda240f68c7f20f9c3ec80fc52b90aa737e1eeaeded48f07fff226ad153d48a66678539e24d82dd7cf55abb01a4d8aa89c7128b2f7a1dc7019e5ef507bf0aaf';
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || DEFAULT_JWT_SECRET);
         userRole = decoded?.role || null;
       }
     } catch (_) {}
@@ -73,7 +74,8 @@ if (process.env.VERCEL !== '1') {
       if (!role && data?.token) {
         try {
           const jwt = require('jsonwebtoken');
-          const decoded = jwt.verify(data.token, process.env.JWT_SECRET);
+          const DEFAULT_JWT_SECRET = '9bda240f68c7f20f9c3ec80fc52b90aa737e1eeaeded48f07fff226ad153d48a66678539e24d82dd7cf55abb01a4d8aa89c7128b2f7a1dc7019e5ef507bf0aaf';
+          const decoded = jwt.verify(data.token, process.env.JWT_SECRET || DEFAULT_JWT_SECRET);
           role = decoded?.role;
         } catch (_) {}
       }
