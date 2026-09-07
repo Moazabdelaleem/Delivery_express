@@ -9,11 +9,19 @@ const VALID_STAGES = [
   'return_verification'
 ];
 
+// Legacy alias map — normalize old mobile stage values to current ones
+const STAGE_ALIASES = {
+  'delivery_completion': 'customer_delivery'
+};
+
 // Generic Upload Attachment (POST /api/orders/:id/attachments)
 exports.uploadAttachment = async (req, res) => {
   try {
     const { id: order_id } = req.params;
-    const { stage, image, is_required } = req.body;
+    let { stage, image, is_required } = req.body;
+
+    // Normalize legacy aliases from older mobile app versions
+    if (stage && STAGE_ALIASES[stage]) stage = STAGE_ALIASES[stage];
 
     if (!stage || !VALID_STAGES.includes(stage)) {
       return res.status(400).json({
