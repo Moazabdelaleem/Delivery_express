@@ -168,7 +168,7 @@ const auth = require('./middleware/auth');
 app.post('/api/users/push-token', auth, authController.savePushToken);
 
 // Seed Demo Accounts (POST /api/seed) — only available in non-production environments
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   app.post('/api/seed', authController.seedDemoAccounts);
   // Auto-seed demo accounts on startup
   authController.seedDemoAccounts().catch(err => console.error('Auto-seed error:', err));

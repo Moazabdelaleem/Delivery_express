@@ -28,7 +28,7 @@ const getClient = async () => {
 };
 
 // Auto-ensure required schema columns and constraints exist in non-production environments
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   (async () => {
     try {
       if (pgPool) {
