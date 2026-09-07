@@ -534,7 +534,9 @@ const translations = {
 
 export function getStageTitle(stage, lang = 'ar') {
   switch (stage) {
-    case 'delivery_completion':
+    case 'customer_delivery':
+      return lang === 'ar' ? '📦 إثبات تسليم الشحنة' : '📦 Delivery Package Proof';
+    case 'delivery_completion': // legacy alias
       return lang === 'ar' ? '📦 إثبات تسليم الشحنة' : '📦 Delivery Package Proof';
     case 'payment_confirmation':
       return lang === 'ar' ? '💳 إثبات تحصيل / تحويل الدفعة' : '💳 Payment Transfer Proof';
@@ -2844,7 +2846,7 @@ const parseSafeJson = async (res) => {
                                     style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                                     onPress={() => {
                                       setSelectedCameraOrder(item);
-                                      setCameraStage('delivery_completion');
+                                      setCameraStage('customer_delivery');
                                       setCameraModal(true);
                                     }}
                                   >
@@ -5592,7 +5594,7 @@ const parseSafeJson = async (res) => {
                 </Text>
                 <PhotoCapture
                   orderId={selectedOrderForOutcome?.id}
-                  stage="delivery_completion"
+                  stage="customer_delivery"
                   token={token}
                   apiBase={apiBase}
                   label={lang === 'ar' ? '📷 التقاط صورة التسليم' : '📷 Take Package Proof Photo'}
