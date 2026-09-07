@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { sendPushNotification, sendPushToRole } = require('../utils/pushNotifier');
 
 // Initiate a Return (Supervisor or System)
 exports.createReturn = async (req, res) => {
@@ -59,8 +60,30 @@ exports.createReturn = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('return_updated', { return_id: insertRes.rows[0].id, order_id, status: initialStatus });
+      const returnPayload = { return_id: insertRes.rows[0].id, order_id, status: initialStatus };
+      // Targeted: driver + inventory + supervisor/manager
+      io.to('role_inventory').to('role_supervisor').to('role_manager').emit('return_updated', returnPayload);
+      if (order.delivery_guy_id) {
+        io.to(`user_${order.delivery_guy_id}`).emit('return_updated', returnPayload);
+      }
     }
+
+    // Push to driver: they need to bring the package back
+    if (order.delivery_guy_id) {
+      sendPushNotification(
+        order.delivery_guy_id,
+        '🔄 Return Pickup Required',
+        `Order #${order.tracking_number} has been flagged for return (${return_type}). Please bring it back to the warehouse.`,
+        { order_id, return_id: insertRes.rows[0].id, type: 'return_pickup' }
+      );
+    }
+
+    // Push to Inventory: they need to receive the package
+    sendPushToRole('inventory',
+      '📦 Incoming Return',
+      `A ${return_type} return for order #${order.tracking_number} is on its way. Reason: ${reason.trim()}`,
+      { order_id, return_id: insertRes.rows[0].id }
+    );
 
     res.status(201).json({
       message: 'Return initiated successfully',
@@ -83,7 +106,7 @@ exports.verifyReturn = async (req, res) => {
     }
 
     const returnRes = await db.query(
-      `SELECT r.*, o.status as current_order_status
+      `SELECT r.*, o.status as current_order_status, o.tracking_number, o.delivery_guy_id
        FROM returns r
        JOIN orders o ON r.order_id = o.id
        WHERE r.id = $1`,
@@ -140,7 +163,33 @@ exports.verifyReturn = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.emit('return_updated', { return_id, status });
+      const verifyPayload = { return_id, order_id: returnRec.order_id, status };
+      // Targeted: driver + supervisor/manager
+      io.to('role_supervisor').to('role_manager').emit('return_updated', verifyPayload);
+      if (returnRec.delivery_guy_id) {
+        io.to(`user_${returnRec.delivery_guy_id}`).emit('return_updated', verifyPayload);
+      }
+    }
+
+    // Push to driver with result of their return
+    if (returnRec.delivery_guy_id) {
+      sendPushNotification(
+        returnRec.delivery_guy_id,
+        status === 'verified' ? '✅ Return Accepted' : '❌ Return Rejected',
+        status === 'verified'
+          ? `Your return for order #${returnRec.tracking_number} was verified and accepted by inventory.`
+          : `Your return for order #${returnRec.tracking_number} was rejected. ${notes ? 'Note: ' + notes : ''}`,
+        { order_id: returnRec.order_id, return_id, status }
+      );
+    }
+
+    // Push to Supervisor on return verified
+    if (status === 'verified') {
+      sendPushToRole('supervisor',
+        '🔄 Return Verified',
+        `Order #${returnRec.tracking_number} has been returned to warehouse and verified.`,
+        { order_id: returnRec.order_id, return_id }
+      );
     }
 
     res.json({

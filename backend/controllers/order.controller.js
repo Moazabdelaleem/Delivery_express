@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { DELIVERY_OUTCOMES, getOutcomeByKey, findOutcome, COLLECTION_FILTER_MAP } = require('../config/deliveryOutcomes');
-const { sendPushNotification } = require('../utils/pushNotifier');
+const { sendPushNotification, sendPushToRole } = require('../utils/pushNotifier');
 
 // Sequential status flow rules (server-side enforcement)
 // handed_to_delivery → in_transit (driver picks up from warehouse)
@@ -636,6 +636,22 @@ exports.updateDeliveryStatus = async (req, res) => {
       io.to(`user_${req.user.id}`).to('role_finance').emit('wallet_updated', { delivery_guy_id: req.user.id });
     }
 
+    // Push: notify Supervisor + Finance when delivery is completed/failed
+    if (['delivered', 'delivery_failed', 'partial_delivery'].includes(status)) {
+      const orderInfo = updatedOrder;
+      const outcomeLabel = outcomeObj ? outcomeObj.label_en : status.replace(/_/g, ' ');
+      sendPushToRole('supervisor',
+        status === 'delivered' ? '✅ Order Delivered' : '⚠️ Delivery Outcome',
+        `Order #${orderInfo.tracking_number} — ${outcomeLabel}`,
+        { order_id, status, tracking_number: orderInfo.tracking_number }
+      );
+      sendPushToRole('manager',
+        status === 'delivered' ? '✅ Order Delivered' : '⚠️ Delivery Outcome',
+        `Order #${orderInfo.tracking_number} — ${outcomeLabel}`,
+        { order_id, status, tracking_number: orderInfo.tracking_number }
+      );
+    }
+
     res.json({
       message: `Delivery status updated to ${status}`,
       order: updatedOrder,
@@ -833,6 +849,13 @@ exports.recordPayment = async (req, res) => {
       // Payment recorded: notify finance + the driver who submitted it
       io.to('role_finance').to('role_manager').to(`user_${req.user.id}`).emit('payment_recorded', { order_id, payment: newPayment });
     }
+
+    // Push: alert Finance team that a new payment proof is pending their review
+    sendPushToRole('finance',
+      '💳 New Payment Proof',
+      `Driver submitted payment of $${numAmount.toFixed(2)} for order #${order.tracking_number} — pending your review.`,
+      { order_id, payment_id: newPayment.id, tracking_number: order.tracking_number }
+    );
 
     res.status(201).json({
       message: 'Payment recorded successfully and submitted for Finance confirmation.',
