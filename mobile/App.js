@@ -13,7 +13,8 @@ import {
   Image,
   Linking,
   Platform,
-  AppState
+  AppState,
+  KeyboardAvoidingView
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -2611,6 +2612,7 @@ const parseSafeJson = async (res) => {
   return (
     <SafeAreaView style={[styles.container, theme.bg]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
       {/* Top Header */}
       <View style={[styles.appHeader, theme.cardBg, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
@@ -2673,7 +2675,13 @@ const parseSafeJson = async (res) => {
       ) : null}
 
       {/* WORKSTATION CONTENT */}
-      <ScrollView style={{ flex: 1, padding: 15 }} contentContainerStyle={{ paddingBottom: 90 }}>
+      <ScrollView
+        style={{ flex: 1, padding: 15 }}
+        contentContainerStyle={{ paddingBottom: 90 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+      >
 
         {/* ── ROLE 1: DELIVERY GUY ── */}
         {user.role === 'delivery_guy' && (
@@ -4013,10 +4021,12 @@ const parseSafeJson = async (res) => {
           </TouchableOpacity>
         ))}
       </View>
+      </KeyboardAvoidingView>
 
       {/* EXPENSE MODAL */}
       <Modal visible={expenseModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>{t('logPocketExpenseTitle')}</Text>
 
@@ -4128,11 +4138,13 @@ const parseSafeJson = async (res) => {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* DISPATCH NEW ORDER WIZARD MODAL (3-STEP SCREEN FLOW) */}
       <Modal visible={createOrderModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDarkMode ? '#334155' : '#cbd5e1', alignSelf: 'center', marginBottom: 12 }} />
 
@@ -5078,7 +5090,8 @@ const parseSafeJson = async (res) => {
 
       {/* FINANCE TOPUP MODAL */}
       <Modal visible={topupModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
               {t('topupModalTitle')} ({dt(targetDriver?.delivery_guy_name || targetDriver?.name)})
@@ -5108,6 +5121,7 @@ const parseSafeJson = async (res) => {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* FINANCE POCKET WALLET LEDGER HISTORY MODAL (Finance / Manager Only) */}
@@ -5249,7 +5263,8 @@ const parseSafeJson = async (res) => {
 
       {/* Delivery Outcome Selection Modal (4-Step Wizard Flow + Modern UI) */}
       <Modal visible={outcomeModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
 
             {/* Step 1 Screen: How was it delivered? */}
@@ -5749,6 +5764,7 @@ const parseSafeJson = async (res) => {
             )}
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* RIDER CAMERA & PHOTO ATTACHMENT MODAL */}
