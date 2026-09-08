@@ -47,6 +47,14 @@ const getClient = async () => {
       await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_order ON order_payments(order_id);');
       await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_recorded_by ON order_payments(recorded_by);');
       await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_status ON order_payments(confirmation_status);');
+      // Partial delivery lifecycle columns
+      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS items_resolution VARCHAR(30) DEFAULT NULL;');
+      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS followup_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL;');
+      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS inventory_vote VARCHAR(20) DEFAULT NULL;');
+      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS supervisor_vote VARCHAR(20) DEFAULT NULL;');
+      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS reassign_driver_id INTEGER REFERENCES users(id) ON DELETE SET NULL;');
+      // Index for liable orders query
+      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_items_resolution ON orders(items_resolution);');
     }
   } catch (err) {
     console.error('Schema auto-patch note:', err.message);

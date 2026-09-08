@@ -732,7 +732,18 @@ exports.getAllOrders = async (req, res) => {
               h.name as inventory_handed_by_name,
               COALESCE(p.confirmed_paid, 0.00) as confirmed_paid,
               COALESCE(p.pending_paid, 0.00) as pending_paid,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance
+              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance,
+              -- Liable: any order where confirmed payments < order amount
+              CASE WHEN GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) > 0
+                   THEN true ELSE false END as is_liable,
+              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_amount,
+              -- Active return info for this order
+              r.id as active_return_id,
+              r.status as active_return_status,
+              r.return_type as active_return_type,
+              r.inventory_vote,
+              r.supervisor_vote,
+              r.reassign_driver_id
        FROM orders o
        LEFT JOIN users s ON o.supervisor_id = s.id
        LEFT JOIN users d ON o.delivery_guy_id = d.id
@@ -744,6 +755,13 @@ exports.getAllOrders = async (req, res) => {
          FROM order_payments
          GROUP BY order_id
        ) p ON p.order_id = o.id
+       LEFT JOIN LATERAL (
+         SELECT id, status, return_type, inventory_vote, supervisor_vote, reassign_driver_id
+         FROM returns
+         WHERE order_id = o.id
+           AND status NOT IN ('cancelled','reassigned','verified','rejected')
+         ORDER BY created_at DESC LIMIT 1
+       ) r ON true
        ORDER BY o.created_at DESC`
     );
     res.json(result.rows);
