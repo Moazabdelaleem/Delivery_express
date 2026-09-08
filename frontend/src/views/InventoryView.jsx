@@ -350,94 +350,177 @@ export default function InventoryView({ token }) {
       )}
 
       {/* TAB 2: RETURNS QUEUE */}
-      {activeTab === 'returns' && (
-        <div>
-          {returnsList.length === 0 ? (
-            <div className="card">
-              <div className="empty-state"><div className="empty-icon">📦</div><p>No return records found.</p></div>
-            </div>
-          ) : (
-            <div className="card-grid">
-              {returnsList.map(ret => {
-                const statusCfg = RETURN_STATUS[ret.status] || { label: ret.status, color: '#6b7280' };
-                const needsReceive = ret.status === 'in_transit_back';
-                const needsVote    = ['pending_verification','awaiting_second_vote','vote_conflict'].includes(ret.status);
-                const isConflict   = ret.status === 'vote_conflict';
+      {activeTab === 'returns' && (() => {
+        const inboundReturns  = returnsList.filter(r => ['in_transit_back', 'pending_pickup'].includes(r.status));
+        const votingReturns   = returnsList.filter(r => ['pending_verification', 'awaiting_second_vote'].includes(r.status));
+        const conflictReturns = returnsList.filter(r => r.status === 'vote_conflict');
+        const historyReturns  = returnsList.filter(r => ['cancelled', 'reassigned', 'verified', 'rejected'].includes(r.status));
 
-                return (
-                  <div key={ret.id} className="card" style={{
-                    borderLeft: `3px solid ${statusCfg.color}`,
-                    background: isConflict ? 'var(--clr-danger-soft, #fef2f2)' : undefined
-                  }}>
-                    {/* Header */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--clr-accent)', fontSize: 13 }}>
-                        #{ret.tracking_number}
-                        <span style={{ marginLeft: 6, fontSize: 11, color: '#6b7280', fontWeight: 400 }}>
-                          {ret.return_type === 'full' ? '· Full Return' : '· Partial Return'}
+        const renderCard = (ret) => {
+          const statusCfg = RETURN_STATUS[ret.status] || { label: ret.status, color: '#6b7280' };
+          const needsReceive = ret.status === 'in_transit_back';
+          const needsVote    = ['pending_verification','awaiting_second_vote','vote_conflict'].includes(ret.status);
+          const isConflict   = ret.status === 'vote_conflict';
+
+          return (
+            <div key={ret.id} className="card" style={{
+              borderLeft: `4px solid ${statusCfg.color}`,
+              background: isConflict ? 'var(--clr-danger-soft, #fef2f2)' : undefined,
+              borderRadius: 12
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                <span style={{ fontWeight: 700, color: 'var(--clr-accent)', fontSize: 14 }}>
+                  #{ret.tracking_number}
+                  <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--clr-text-muted)', fontWeight: 500 }}>
+                    {ret.return_type === 'full' ? '· Full Return' : '· Partial Return'}
+                  </span>
+                </span>
+                <span style={{ fontSize: 11, background: statusCfg.color + '22', color: statusCfg.color,
+                  borderRadius: 6, padding: '3px 9px', fontWeight: 800 }}>
+                  {statusCfg.label}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 4 }}>📍 {ret.client_address}</div>
+              <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 4 }}>
+                🚚 Driver: <strong>{ret.driver_name || '—'}</strong>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 10 }}>
+                <strong>Reason:</strong> {ret.reason}
+              </div>
+
+              {/* "Receive Items" button for in_transit_back */}
+              {(needsReceive || ret.status === 'pending_pickup') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ width: '100%', fontWeight: 700 }}
+                    disabled={submitting[`rcv_${ret.id}`]}
+                    onClick={() => setReceiveModal(ret)}
+                  >
+                    📦 Receive Items at Warehouse
+                  </button>
+                  {ret.status === 'pending_pickup' && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ width: '100%', fontSize: 11 }}
+                      disabled={submitting[`ft_${ret.id}`]}
+                      onClick={() => handleForceTransit(ret.id)}
+                    >
+                      ⚡ Force Mark Heading Back
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Vote panel for pending_verification / awaiting_second_vote / vote_conflict */}
+              {needsVote && (
+                <VotePanel
+                  ret={ret}
+                  myRole="inventory"
+                  onVote={handleVote}
+                  submitting={submitting[`vote_${ret.id}`]}
+                />
+              )}
+
+              {/* Resolved state */}
+              {['cancelled','reassigned','verified','rejected'].includes(ret.status) && (
+                <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', fontStyle: 'italic', marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--clr-border)' }}>
+                  {ret.status === 'reassigned' ? `✅ Follow-up order created` : `Closed: ${ret.status}`}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {returnsList.length === 0 ? (
+              <div className="card">
+                <div className="empty-state"><div className="empty-icon">📦</div><p>No return records found.</p></div>
+              </div>
+            ) : (
+              <>
+                {/* SUB-SECTION 3: CONFLICTS (TOP PRIORITY WARNING) */}
+                {conflictReturns.length > 0 && (
+                  <div className="card" style={{ border: '2px solid #ef4444', background: '#fff5f5' }}>
+                    <div className="card-header" style={{ marginBottom: 12 }}>
+                      <span className="card-title" style={{ color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        ⚡ 1. Vote Conflicts & Disagreements
+                        <span style={{ background: '#ef4444', color: 'white', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 800 }}>
+                          {conflictReturns.length}
                         </span>
                       </span>
-                      <span style={{ fontSize: 11, background: statusCfg.color + '22', color: statusCfg.color,
-                        borderRadius: 6, padding: '2px 8px', fontWeight: 700 }}>
-                        {statusCfg.label}
+                      <span style={{ fontSize: 12, color: '#dc2626' }}>Requires vote alignment or Manager Override</span>
+                    </div>
+                    <div className="card-grid">
+                      {conflictReturns.map(renderCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* SUB-SECTION 1: INBOUND RETURNS */}
+                <div className="card">
+                  <div className="card-header" style={{ marginBottom: 12 }}>
+                    <span className="card-title" style={{ color: '#d97706', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🚚 2. Inbound Returns (Drivers En-Route to Warehouse)
+                      <span style={{ background: '#f59e0b', color: 'white', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 800 }}>
+                        {inboundReturns.length}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>Confirm physical package receipt when driver arrives</span>
+                  </div>
+                  {inboundReturns.length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--clr-text-dim)', fontStyle: 'italic', padding: 8 }}>No drivers currently heading back with returns.</p>
+                  ) : (
+                    <div className="card-grid">
+                      {inboundReturns.map(renderCard)}
+                    </div>
+                  )}
+                </div>
+
+                {/* SUB-SECTION 2: VOTING QUEUE */}
+                <div className="card">
+                  <div className="card-header" style={{ marginBottom: 12 }}>
+                    <span className="card-title" style={{ color: '#2563eb', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🗳️ 3. Warehouse Receipt & Voting Queue
+                      <span style={{ background: '#2563eb', color: 'white', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 800 }}>
+                        {votingReturns.length}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>Vote to Kill (cancel items) or Reassign (send out again)</span>
+                  </div>
+                  {votingReturns.length === 0 ? (
+                    <p style={{ fontSize: 13, color: 'var(--clr-text-dim)', fontStyle: 'italic', padding: 8 }}>No items currently awaiting inventory vote.</p>
+                  ) : (
+                    <div className="card-grid">
+                      {votingReturns.map(renderCard)}
+                    </div>
+                  )}
+                </div>
+
+                {/* SUB-SECTION 4: RESOLVED / HISTORY */}
+                {historyReturns.length > 0 && (
+                  <div className="card">
+                    <div className="card-header" style={{ marginBottom: 12 }}>
+                      <span className="card-title" style={{ color: 'var(--clr-text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        📜 4. Closed & Resolved Returns History
+                        <span style={{ background: '#6b7280', color: 'white', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 800 }}>
+                          {historyReturns.length}
+                        </span>
                       </span>
                     </div>
-
-                    <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 4 }}>📍 {ret.client_address}</div>
-                    <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 4 }}>
-                      🚚 Driver: <strong>{ret.driver_name || '—'}</strong>
+                    <div className="card-grid">
+                      {historyReturns.map(renderCard)}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 10 }}>
-                      Reason: {ret.reason}
-                    </div>
-
-                    {/* "Receive Items" button for in_transit_back */}
-                    {(needsReceive || ret.status === 'pending_pickup') && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button
-                          className="btn btn-primary btn-sm"
-                          style={{ width: '100%' }}
-                          disabled={submitting[`rcv_${ret.id}`]}
-                          onClick={() => setReceiveModal(ret)}
-                        >
-                          📦 Receive Items at Warehouse
-                        </button>
-                        {ret.status === 'pending_pickup' && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ width: '100%', fontSize: 11 }}
-                            disabled={submitting[`ft_${ret.id}`]}
-                            onClick={() => handleForceTransit(ret.id)}
-                          >
-                            ⚡ Force Mark Heading Back
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Vote panel for pending_verification / awaiting_second_vote / vote_conflict */}
-                    {needsVote && (
-                      <VotePanel
-                        ret={ret}
-                        myRole="inventory"
-                        onVote={handleVote}
-                        submitting={submitting[`vote_${ret.id}`]}
-                      />
-                    )}
-
-                    {/* Resolved state */}
-                    {['cancelled','reassigned','verified','rejected'].includes(ret.status) && (
-                      <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', fontStyle: 'italic' }}>
-                        {ret.status === 'reassigned' ? `✅ Follow-up order created` : `Closed: ${ret.status}`}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Handoff Confirmation Modal */}
       {noteModal && (
