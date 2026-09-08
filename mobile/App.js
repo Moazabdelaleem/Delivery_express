@@ -729,8 +729,14 @@ function MainApp() {
   const [notification, setNotification] = useState(null);
   const [driverOnline, setDriverOnline] = useState(false);
   const [workedHoursToday, setWorkedHoursToday] = useState('0.00');
-  const [workedHoursMonth, setWorkedHoursMonth] = useState('0.00');
   const [shiftSummaries, setShiftSummaries] = useState([]);
+  const [returnsList, setReturnsList] = useState([]);
+  const [receiveModal, setReceiveModal] = useState(false);
+  const [selectedReturnForReceive, setSelectedReturnForReceive] = useState(null);
+  const [receiveDmgQty, setReceiveDmgQty] = useState('0');
+  const [receiveCondNotes, setReceiveCondNotes] = useState('');
+  const [reassignDriverIdMap, setReassignDriverIdMap] = useState({});
+  const [showDriverPickMap, setShowDriverPickMap] = useState({});
 
   // Feature States
   const [liveGpsEnabled, setLiveGpsEnabled] = useState(true);
@@ -1465,6 +1471,16 @@ const parseSafeJson = async (res) => {
         });
         const expData = await parseSafeJson(expRes);
         if (expRes.ok && expData) setExpensesBreakdown(expData);
+
+        try {
+          const retQueueRes = await fetch(`${apiBase}/returns/queue`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const retQueueData = await parseSafeJson(retQueueRes);
+          if (Array.isArray(retQueueData)) setReturnsList(retQueueData);
+        } catch (eRet) {
+          console.log('Returns queue fetch error:', eRet);
+        }
       }
 
       if (user.role === 'manager') {
@@ -2112,6 +2128,559 @@ const parseSafeJson = async (res) => {
     );
   };
 
+  const handleConfirmReceiveItems = async () => {
+    if (!selectedReturnForReceive) return;
+    setActionLoadingId(`receive_${selectedReturnForReceive.id}`);
+    try {
+      const res = await fetch(`${apiBase}/returns/${selectedReturnForReceive.id}/receive`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          damaged_count: parseInt(receiveDmgQty) || 0,
+          condition_notes: receiveCondNotes.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(lang === 'ar' ? '✅ تم تأكيد استلام المنتجات المرتجعة بالمخزن!' : '✅ Received items logged physically into warehouse queue!');
+        setReceiveModal(false);
+        setSelectedReturnForReceive(null);
+        setReceiveDmgQty('0');
+        setReceiveCondNotes('');
+        fetchData();
+      } else {
+        Alert.alert(t('alertError'), data.error || 'Failed to confirm receipt');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleCastReturnVote = async (returnId, voteAction) => {
+    const chosenDriverId = reassignDriverIdMap[returnId];
+    if (voteAction === 'reassign' && !chosenDriverId) {
+      Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى اختيار مندوب لإعادة الإسناد' : 'Please select a driver for re-assignment');
+      return;
+    }
+    setActionLoadingId(`vote_${returnId}`);
+    try {
+      const res = await fetch(`${apiBase}/returns/${returnId}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          vote_action: voteAction,
+          reassign_driver_id: chosenDriverId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(lang === 'ar' ? '✅ تم تسجيل تصويتك على حالة المرتجع بنجاح!' : '✅ Vote recorded successfully!');
+        fetchData();
+      } else {
+        Alert.alert(t('alertError'), data.error || 'Vote failed');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleForceTransitReturn = async (returnId) => {
+    setActionLoadingId(`transit_${returnId}`);
+    try {
+      const res = await fetch(`${apiBase}/returns/${returnId}/force-transit`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(lang === 'ar' ? '🚚 تم بدء شحن المرتجع للمخزن' : '🚚 Forced return in transit to warehouse');
+        fetchData();
+      } else {
+        Alert.alert(t('alertError'), data.error || 'Failed to force transit');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleManagerOverrideReturn = async (returnId, decision) => {
+    const chosenDriverId = reassignDriverIdMap[returnId];
+    if (decision === 'reassign' && !chosenDriverId) {
+      Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى اختيار مندوب لإعادة الإسناد' : 'Please select a driver for re-assignment');
+      return;
+    }
+    setActionLoadingId(`override_${returnId}`);
+    try {
+      const res = await fetch(`${apiBase}/returns/${returnId}/manager-override`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          override_decision: decision,
+          reassign_driver_id: chosenDriverId
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(lang === 'ar' ? '⚡ تم تطبيق قرار المدير وكسر التعادل بنجاح!' : '⚡ Manager override decision applied!');
+        fetchData();
+      } else {
+        Alert.alert(t('alertError'), data.error || 'Override failed');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const renderMobileReturnsQueue = (currentRole) => {
+    const voteConflicts = returnsList.filter(r => r.status === 'vote_conflict');
+    const inboundReturns = returnsList.filter(r => r.status === 'in_transit_back' || r.status === 'pending_pickup');
+    const votingQueue = returnsList.filter(r => r.status === 'pending_verification' || r.status === 'awaiting_second_vote');
+    const closedHistory = returnsList.filter(r => ['resolved_killed', 'resolved_reassigned', 'cancelled'].includes(r.status));
+
+    const totalCount = returnsList.length;
+
+    return (
+      <View style={{ gap: 16 }}>
+        {/* Header Summary Banner */}
+        <View style={{
+          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          borderRadius: 16,
+          padding: 16,
+          borderWidth: 1,
+          borderColor: isDarkMode ? '#334155' : '#cbd5e1'
+        }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, theme.text, { fontSize: 18, marginBottom: 2 }, isRTL && styles.rtlText]}>
+                ↩️ {lang === 'ar' ? 'إدارة المرتجعات والتصويت' : 'Returns & Voting Queue'}
+              </Text>
+              <Text style={[theme.textMuted, { fontSize: 12 }, isRTL && styles.rtlText]}>
+                {lang === 'ar' ? 'تصويت المخزن والمشرف للتأكيد والتوجيه' : 'Warehouse & Supervisor dual-verification & voting board'}
+              </Text>
+            </View>
+            <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
+              <Text style={{ color: '#ffffff', fontWeight: '900', fontSize: 14 }}>{totalCount}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* SUB-SECTION 1: ⚡ VOTE CONFLICTS */}
+        {voteConflicts.length > 0 && (
+          <View style={{ gap: 10 }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 15, fontWeight: '900', color: '#ef4444' }}>
+                ⚡ {lang === 'ar' ? '1. نزاعات وتضارب التصويت' : '1. Vote Conflicts'} ({voteConflicts.length})
+              </Text>
+              <View style={{ backgroundColor: '#fee2e2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                <Text style={{ color: '#991b1b', fontSize: 10, fontWeight: '800' }}>
+                  {lang === 'ar' ? 'يتطلب تدخّل المدير' : 'Requires Manager Override'}
+                </Text>
+              </View>
+            </View>
+
+            {voteConflicts.map(ret => {
+              const driverIdChosen = reassignDriverIdMap[ret.id];
+              const isDriverPickShow = showDriverPickMap[ret.id];
+              return (
+                <View key={`conf-${ret.id}`} style={{
+                  backgroundColor: isDarkMode ? '#1e1b4b' : '#fff5f5',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 2,
+                  borderColor: '#ef4444'
+                }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#dc2626' }}>
+                      #{ret.tracking_number || ret.order_id}
+                    </Text>
+                    <View style={{ backgroundColor: '#ef4444', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
+                      <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: '800' }}>
+                        ⚡ {lang === 'ar' ? 'تضارب بالآراء' : 'Vote Conflict'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[theme.text, { fontSize: 13, fontWeight: '700', marginBottom: 4 }, isRTL && styles.rtlText]}>
+                    📍 {dt(ret.client_address || ret.address || 'Address')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#78716c', marginBottom: 6 }}>
+                    {lang === 'ar' ? 'السبب: ' : 'Reason: '}{ret.reason || '—'}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#dc2626', marginBottom: 10 }}>
+                    {lang === 'ar' ? 'قيمة المرتجع: ' : 'Returned Amount: '}EGP {parseFloat(ret.returned_items_amount || 0).toFixed(2)}
+                  </Text>
+
+                  {/* Show supervisor & inventory votes */}
+                  <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', padding: 10, borderRadius: 10, marginBottom: 12, borderWidth: 1, borderColor: '#fca5a5' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#991b1b', marginBottom: 4 }}>
+                      📊 {lang === 'ar' ? 'سجل الأصوات المتضاربة:' : 'Conflicting Votes Log:'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.text.color }}>
+                      👔 {lang === 'ar' ? 'تصويت المشرف: ' : 'Supervisor: '}{ret.supervisor_vote || '—'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.text.color }}>
+                      🏭 {lang === 'ar' ? 'تصويت المخزن: ' : 'Warehouse: '}{ret.inventory_vote || '—'}
+                    </Text>
+                  </View>
+
+                  {/* Manager Override Options vs Staff Alert */}
+                  {currentRole === 'manager' ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#dc2626' }}>
+                        ⚡ {lang === 'ar' ? 'قرار المدير الفاصل (كسر التعادل):' : 'Manager Override Decision:'}
+                      </Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          disabled={actionLoadingId === `override_${ret.id}`}
+                          onPress={() => handleManagerOverrideReturn(ret.id, 'kill')}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
+                            🔴 {lang === 'ar' ? 'إلغاء وإرجاع للتاجر' : 'Kill Order'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#10b981', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          onPress={() => {
+                            setShowDriverPickMap(prev => ({ ...prev, [ret.id]: !prev[ret.id] }));
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
+                            🟢 {lang === 'ar' ? 'إعادة إسناد لمندوب' : 'Reassign Order'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {(isDriverPickShow || driverIdChosen) && (
+                        <View style={{ marginTop: 8, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 10, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: theme.text.color, marginBottom: 6 }}>
+                            {lang === 'ar' ? 'اختر مندوب التوصيل الجديد:' : 'Select New Delivery Driver:'}
+                          </Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                            {safeDeliveryGuys.map(g => {
+                              const dId = g.id || g.delivery_guy_id;
+                              const isSel = driverIdChosen === dId;
+                              return (
+                                <TouchableOpacity
+                                  key={`drv-${dId}`}
+                                  style={{
+                                    backgroundColor: isSel ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    borderRadius: 8
+                                  }}
+                                  onPress={() => {
+                                    setReassignDriverIdMap(prev => ({ ...prev, [ret.id]: dId }));
+                                  }}
+                                >
+                                  <Text style={{ color: isSel ? '#fff' : theme.text.color, fontSize: 11, fontWeight: '800' }}>
+                                    {dt(g.name || g.delivery_guy_name)}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                          {driverIdChosen && (
+                            <TouchableOpacity
+                              style={{ backgroundColor: '#10b981', paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                              disabled={actionLoadingId === `override_${ret.id}`}
+                              onPress={() => handleManagerOverrideReturn(ret.id, 'reassign')}
+                            >
+                              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                                ✅ {lang === 'ar' ? 'تأكيد إعادة الإسناد' : 'Confirm Reassign Override'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: '#fee2e2', padding: 10, borderRadius: 10, alignItems: 'center' }}>
+                      <Text style={{ color: '#991b1b', fontSize: 12, fontWeight: '800' }}>
+                        ⏳ {lang === 'ar' ? 'في انتظار قرار المدير التنفيذي لكسر التعادل' : 'Awaiting Executive Manager override decision'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* SUB-SECTION 2: 🚚 INBOUND RETURNS */}
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: '#d97706' }}>
+              🚚 {lang === 'ar' ? '2. مرتجعات قادمة للمخزن' : '2. Inbound Returns'} ({inboundReturns.length})
+            </Text>
+          </View>
+
+          {inboundReturns.length === 0 ? (
+            <Text style={[styles.emptyText, theme.textMuted, { fontSize: 12 }]}>
+              {lang === 'ar' ? 'لا توجد شحنات مرتجعة بالطريق للمخزن' : 'No inbound return packages currently in transit'}
+            </Text>
+          ) : (
+            inboundReturns.map(ret => (
+              <View key={`inb-${ret.id}`} style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#fffbeb',
+                borderRadius: 16,
+                padding: 16,
+                borderWidth: 1.5,
+                borderColor: '#f59e0b'
+              }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '900', color: '#b45309' }}>
+                    #{ret.tracking_number || ret.order_id}
+                  </Text>
+                  <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: '#fcd34d' }}>
+                    <Text style={{ color: '#b45309', fontSize: 11, fontWeight: '800' }}>
+                      🚚 {ret.status === 'in_transit_back' ? (lang === 'ar' ? 'بالطريق للمخزن' : 'In Transit Back') : (lang === 'ar' ? 'مع المندوب' : 'With Driver')}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={[theme.text, { fontSize: 13, fontWeight: '700', marginBottom: 4 }, isRTL && styles.rtlText]}>
+                  📍 {dt(ret.client_address || ret.address || 'Address')}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#78716c', marginBottom: 6 }}>
+                  {lang === 'ar' ? 'المندوب: ' : 'Driver: '}{dt(ret.delivery_guy_name || '—')}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#dc2626', marginBottom: 12 }}>
+                  {lang === 'ar' ? 'قيمة المرتجع: ' : 'Returned Amount: '}EGP {parseFloat(ret.returned_items_amount || 0).toFixed(2)}
+                </Text>
+
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: '#f59e0b', paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+                    onPress={() => {
+                      setSelectedReturnForReceive(ret);
+                      setReceiveDmgQty('0');
+                      setReceiveCondNotes('');
+                      setReceiveModal(true);
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
+                      📦 {lang === 'ar' ? 'استلام فعلي بالمخزن وتفتيش' : 'Receive & Inspect'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {ret.status === 'pending_pickup' && (
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, alignItems: 'center' }}
+                      disabled={actionLoadingId === `transit_${ret.id}`}
+                      onPress={() => handleForceTransitReturn(ret.id)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+                        🚀 {lang === 'ar' ? 'بدء الشحن' : 'Force Transit'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* SUB-SECTION 3: 🗳️ VOTING QUEUE */}
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: '#2563eb' }}>
+              🗳️ {lang === 'ar' ? '3. قائمة التصويت والتوجيه' : '3. Voting Queue'} ({votingQueue.length})
+            </Text>
+          </View>
+
+          {votingQueue.length === 0 ? (
+            <Text style={[styles.emptyText, theme.textMuted, { fontSize: 12 }]}>
+              {lang === 'ar' ? 'لا توجد مرتجعات تنتظر التصويت حالياً' : 'No return packages awaiting verification vote'}
+            </Text>
+          ) : (
+            votingQueue.map(ret => {
+              const driverIdChosen = reassignDriverIdMap[ret.id];
+              const isDriverPickShow = showDriverPickMap[ret.id];
+              return (
+                <View key={`vote-${ret.id}`} style={{
+                  backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1.5,
+                  borderColor: '#3b82f6'
+                }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#1d4ed8' }}>
+                      #{ret.tracking_number || ret.order_id}
+                    </Text>
+                    <View style={{ backgroundColor: '#dbeafe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
+                      <Text style={{ color: '#1e40af', fontSize: 11, fontWeight: '800' }}>
+                        🗳️ {ret.status === 'awaiting_second_vote' ? (lang === 'ar' ? 'بانتظار الصوت الثاني' : 'Awaiting 2nd Vote') : (lang === 'ar' ? 'بانتظار التأكيد' : 'Pending Verification')}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={[theme.text, { fontSize: 13, fontWeight: '700', marginBottom: 4 }, isRTL && styles.rtlText]}>
+                    📍 {dt(ret.client_address || ret.address || 'Address')}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#78716c', marginBottom: 4 }}>
+                    {lang === 'ar' ? 'السبب: ' : 'Reason: '}{ret.reason || '—'}
+                  </Text>
+                  {ret.condition_notes ? (
+                    <Text style={{ fontSize: 12, color: '#d97706', marginBottom: 6 }}>
+                      📋 {lang === 'ar' ? 'حالة الطرد: ' : 'Condition: '}{ret.condition_notes} ({ret.damaged_count || 0} {lang === 'ar' ? 'تالف' : 'damaged'})
+                    </Text>
+                  ) : null}
+
+                  {/* Existing Votes Status */}
+                  <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', padding: 8, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ fontSize: 11, color: theme.text.color, fontWeight: '700' }}>
+                      👔 {lang === 'ar' ? 'المشرف: ' : 'Supervisor: '}{ret.supervisor_vote ? (ret.supervisor_vote === 'kill' ? '🔴 Kill' : '🟢 Reassign') : '⏳ Pending'}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: theme.text.color, fontWeight: '700' }}>
+                      🏭 {lang === 'ar' ? 'المخزن: ' : 'Warehouse: '}{ret.inventory_vote ? (ret.inventory_vote === 'kill' ? '🔴 Kill' : '🟢 Reassign') : '⏳ Pending'}
+                    </Text>
+                  </View>
+
+                  {/* Voting Action Buttons */}
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                        disabled={actionLoadingId === `vote_${ret.id}`}
+                        onPress={() => handleCastReturnVote(ret.id, 'kill')}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
+                          🔴 {lang === 'ar' ? 'تصويت: إرجاع للتاجر' : 'Vote: Kill Order'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: '#10b981', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                        onPress={() => {
+                          setShowDriverPickMap(prev => ({ ...prev, [ret.id]: !prev[ret.id] }));
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
+                          🟢 {lang === 'ar' ? 'تصويت: إعادة إسناد' : 'Vote: Reassign'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {(isDriverPickShow || driverIdChosen) && (
+                      <View style={{ marginTop: 6, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', padding: 10, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: theme.text.color, marginBottom: 6 }}>
+                          {lang === 'ar' ? 'اختر مندوب التوصيل الجديد:' : 'Select New Delivery Driver:'}
+                        </Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                          {safeDeliveryGuys.map(g => {
+                            const dId = g.id || g.delivery_guy_id;
+                            const isSel = driverIdChosen === dId;
+                            return (
+                              <TouchableOpacity
+                                key={`drv-v-${dId}`}
+                                style={{
+                                  backgroundColor: isSel ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 6,
+                                  borderRadius: 8
+                                }}
+                                onPress={() => {
+                                  setReassignDriverIdMap(prev => ({ ...prev, [ret.id]: dId }));
+                                }}
+                              >
+                                <Text style={{ color: isSel ? '#fff' : theme.text.color, fontSize: 11, fontWeight: '800' }}>
+                                  {dt(g.name || g.delivery_guy_name)}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                        {driverIdChosen && (
+                          <TouchableOpacity
+                            style={{ backgroundColor: '#10b981', paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                            disabled={actionLoadingId === `vote_${ret.id}`}
+                            onPress={() => handleCastReturnVote(ret.id, 'reassign')}
+                          >
+                            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                              ✅ {lang === 'ar' ? 'تأكيد تصويت إعادة الإسناد' : 'Confirm Reassign Vote'}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+        </View>
+
+        {/* SUB-SECTION 4: 📜 CLOSED HISTORY */}
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 15, fontWeight: '900', color: '#64748b' }}>
+              📜 {lang === 'ar' ? '4. سجل المرتجعات المغلقة' : '4. Closed History'} ({closedHistory.length})
+            </Text>
+          </View>
+
+          {closedHistory.length === 0 ? (
+            <Text style={[styles.emptyText, theme.textMuted, { fontSize: 12 }]}>
+              {lang === 'ar' ? 'لا يوجد سجل مرتجعات مغلقة حالياً' : 'No closed or resolved return history recorded yet'}
+            </Text>
+          ) : (
+            closedHistory.slice(0, 10).map(ret => (
+              <View key={`cls-${ret.id}`} style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                borderRadius: 14,
+                padding: 12,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#334155' : '#e2e8f0'
+              }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: theme.text.color }}>
+                    #{ret.tracking_number || ret.order_id}
+                  </Text>
+                  <View style={{
+                    backgroundColor: ret.status === 'resolved_killed' ? '#fee2e2' : (ret.status === 'resolved_reassigned' ? '#d1fae5' : '#f3f4f6'),
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 6
+                  }}>
+                    <Text style={{
+                      color: ret.status === 'resolved_killed' ? '#991b1b' : (ret.status === 'resolved_reassigned' ? '#065f46' : '#4b5563'),
+                      fontSize: 10,
+                      fontWeight: '800'
+                    }}>
+                      {ret.status === 'resolved_killed' ? (lang === 'ar' ? '🔴 مرجع للتاجر' : 'Killed & Returned') :
+                       ret.status === 'resolved_reassigned' ? (lang === 'ar' ? '🟢 أُعيد إسناده' : 'Reassigned') : (lang === 'ar' ? 'ملغي' : 'Cancelled')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                  {new Date(ret.updated_at || ret.created_at).toLocaleString()}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+    );
+  };
+
 
 
   const handleLogout = async () => {
@@ -2581,12 +3150,14 @@ const parseSafeJson = async (res) => {
         return [
           { id: 'tab1', icon: 'paper-plane-outline', label: t('tabDispatchBoard'), badge: activeOrders.length },
           { id: 'tab2', icon: 'people-outline', label: t('tabDriverRoster'), badge: safeDeliveryGuys.length },
-          { id: 'tab3', icon: 'archive-outline', label: t('tabHistory') }
+          { id: 'tab3', icon: 'archive-outline', label: t('tabHistory') },
+          { id: 'tab4', icon: 'return-down-back-outline', label: lang === 'ar' ? 'المرتجعات والتصويت' : 'Returns & Votes', badge: returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'vote_conflict'].includes(r.status)).length }
         ];
       case 'inventory':
         return [
           { id: 'tab1', icon: 'home-outline', label: t('tabWarehouseQueue'), badge: inventoryQueue.length },
-          { id: 'tab2', icon: 'alert-circle-outline', label: t('tabStagingIssues'), badge: inventoryIssues.length }
+          { id: 'tab2', icon: 'alert-circle-outline', label: t('tabStagingIssues'), badge: inventoryIssues.length },
+          { id: 'tab3', icon: 'return-down-back-outline', label: lang === 'ar' ? 'مرتجعات المحطة' : 'Returns Queue', badge: returnsList.filter(r => ['in_transit_back', 'pending_verification', 'awaiting_second_vote', 'vote_conflict'].includes(r.status)).length }
         ];
       case 'finance':
         return [
@@ -2594,13 +3165,14 @@ const parseSafeJson = async (res) => {
           { id: 'tab2', icon: 'receipt-outline', label: t('tabAuditHistory') }
         ];
       case 'manager':
-        // Master Executive Control Center (5-Tab Read-Only Overview)
+        // Master Executive Control Center
         return [
           { id: 'tab1', icon: 'pie-chart-outline', label: t('tabMasterOverview') },
           { id: 'tab2', icon: 'list-outline', label: t('tabOpsBoard'), badge: safeOrders.length },
           { id: 'tab3', icon: 'people-outline', label: t('tabDriverRoster'), badge: safeDeliveryGuys.length },
           { id: 'tab4', icon: 'receipt-outline', label: t('tabExpensesLog') },
-          { id: 'tab5', icon: 'shield-checkmark-outline', label: t('tabApprovalsRoster'), badge: pendingManagers.length }
+          { id: 'tab5', icon: 'shield-checkmark-outline', label: t('tabApprovalsRoster'), badge: pendingManagers.length },
+          { id: 'tab6', icon: 'alert-circle-outline', label: lang === 'ar' ? 'نزاعات المرتجعات' : 'Conflict Overrides', badge: returnsList.filter(r => r.status === 'vote_conflict').length }
         ];
       default:
         return [];
@@ -3285,6 +3857,12 @@ const parseSafeJson = async (res) => {
                 )}
               </View>
             )}
+            {/* TAB 4: Returns & Votes */}
+            {activeTab === 'tab4' && (
+              <View>
+                {renderMobileReturnsQueue('supervisor')}
+              </View>
+            )}
           </View>
         )}
 
@@ -3473,6 +4051,12 @@ const parseSafeJson = async (res) => {
                     </TouchableOpacity>
                   ));
                 })()}
+              </View>
+            )}
+            {/* TAB 3: Returns Queue */}
+            {activeTab === 'tab3' && (
+              <View>
+                {renderMobileReturnsQueue('inventory')}
               </View>
             )}
           </View>
@@ -3985,6 +4569,12 @@ const parseSafeJson = async (res) => {
               </View>
             )}
 
+            {/* TAB 6: Conflict Overrides */}
+            {activeTab === 'tab6' && (
+              <View>
+                {renderMobileReturnsQueue('manager')}
+              </View>
+            )}
           </View>
         )}
 
@@ -4138,6 +4728,83 @@ const parseSafeJson = async (res) => {
             </TouchableOpacity>
           </View>
         </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* PHYSICAL RECEIPT MODAL FOR INVENTORY */}
+      <Modal visible={receiveModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
+              <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDarkMode ? '#334155' : '#cbd5e1', alignSelf: 'center', marginBottom: 12 }} />
+              
+              <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
+                📦 {lang === 'ar' ? 'تأكيد استلام وفحص الطرد المرتجع بالمخزن' : 'Physical Receipt & Inspection'}
+              </Text>
+              
+              {selectedReturnForReceive && (
+                <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 12, marginBottom: 14, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
+                  <Text style={[theme.text, { fontWeight: '900', fontSize: 14 }]}>
+                    #{selectedReturnForReceive.tracking_number || selectedReturnForReceive.order_id}
+                  </Text>
+                  <Text style={[theme.textMuted, { fontSize: 12, marginTop: 2 }]}>
+                    📍 {dt(selectedReturnForReceive.client_address || 'Address')}
+                  </Text>
+                  <Text style={{ color: '#dc2626', fontSize: 12, fontWeight: '800', marginTop: 4 }}>
+                    {lang === 'ar' ? 'المبلغ المراد إرجاعه للعميل/التاجر: ' : 'Returned Amount: '}EGP {parseFloat(selectedReturnForReceive.returned_items_amount || 0).toFixed(2)}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>
+                ⚠️ {lang === 'ar' ? 'عدد القطع التالفة / المفقودة (إن وجد):' : 'Damaged / Missing Items Count:'}
+              </Text>
+              <TextInput
+                style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
+                placeholder="0"
+                placeholderTextColor="#94a3b8"
+                keyboardType="numeric"
+                value={receiveDmgQty}
+                onChangeText={setReceiveDmgQty}
+              />
+
+              <Text style={[styles.inputLabel, theme.text, isRTL && styles.rtlText]}>
+                📝 {lang === 'ar' ? 'ملاحظات وتفاصيل حالة الطرد عند الاستلام:' : 'Package Condition & Audit Notes:'}
+              </Text>
+              <TextInput
+                style={[styles.input, theme.inputBg, theme.text, { height: 80, textAlignVertical: 'top' }, isRTL && styles.rtlText]}
+                placeholder={lang === 'ar' ? 'أدخل ملاحظات التفتيش الفيزيائي للطرد بالمخزن...' : 'Enter condition details...'}
+                placeholderTextColor="#94a3b8"
+                multiline
+                value={receiveCondNotes}
+                onChangeText={setReceiveCondNotes}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: '#f59e0b', marginTop: 12 }]}
+                disabled={actionLoadingId === `receive_${selectedReturnForReceive?.id}`}
+                onPress={handleConfirmReceiveItems}
+              >
+                {actionLoadingId === `receive_${selectedReturnForReceive?.id}` ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    ✅ {lang === 'ar' ? 'تأكيد الاستلام بالمخزن والتحويل للتصويت' : 'Confirm Receipt & Push to Vote Queue'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setReceiveModal(false);
+                  setSelectedReturnForReceive(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 

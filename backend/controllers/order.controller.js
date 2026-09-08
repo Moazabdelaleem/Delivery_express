@@ -358,7 +358,7 @@ exports.inventoryHandoff = async (req, res) => {
 exports.updateDeliveryStatus = async (req, res) => {
   let client;
   try {
-    const { order_id } = req.params;
+    const order_id = req.params.order_id || req.params.id;
     const {
       status: inputStatus,
       outcome_key,
