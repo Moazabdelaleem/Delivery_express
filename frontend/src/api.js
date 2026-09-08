@@ -168,6 +168,23 @@ export const verifyReturn = (returnId, payload, token) =>
     body: JSON.stringify(payload)
   }).then(handle);
 
+export const transitBack = (returnId, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/transit-back`, {
+    method: 'PATCH', headers: headers(token)
+  }).then(handle);
+
+export const receiveItems = (returnId, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/receive`, {
+    method: 'PATCH', headers: headers(token)
+  }).then(handle);
+
+export const castVote = (returnId, payload, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/vote`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+
 // ---- Attachments ----
 export const uploadOrderAttachment = (orderId, payload, token) =>
   fetch(`${BASE_URL}/orders/${orderId}/attachments`, {

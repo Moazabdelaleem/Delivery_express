@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary } from '../api.js';
+import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary, castVote } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
@@ -176,7 +176,10 @@ export default function SupervisorView({ token, user }) {
     }
   };
 
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const liableOrders = orders.filter(o => o.is_liable);
+  const filtered = filter === 'liable'
+    ? liableOrders
+    : filter === 'all' ? orders : orders.filter(o => o.status === filter);
 
   const counts = orders.reduce((acc, o) => {
     acc[o.status] = (acc[o.status] || 0) + 1;
@@ -249,6 +252,12 @@ export default function SupervisorView({ token, user }) {
             {drivers.filter(d => d.online_status === 'online').length}/{drivers.length}
           </div>
         </div>
+        <div className="stat-card stat-card-clickable" onClick={() => setFilter('liable')} title="Orders with outstanding cash">
+          <div className="stat-label">⚠️ Liable Orders</div>
+          <div className="stat-value" style={{ color: liableOrders.length > 0 ? '#f59e0b' : 'var(--clr-success)' }}>
+            {liableOrders.length}
+          </div>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -263,6 +272,13 @@ export default function SupervisorView({ token, user }) {
             {s !== 'all' && counts[s] ? ` (${counts[s]})` : ''}
           </button>
         ))}
+        <button
+          className={`btn btn-sm ${filter === 'liable' ? 'btn-warning' : 'btn-ghost'}`}
+          onClick={() => setFilter('liable')}
+          style={filter !== 'liable' && liableOrders.length > 0 ? { borderColor: '#f59e0b', color: '#f59e0b' } : {}}
+        >
+          ⚠️ Liable {liableOrders.length > 0 ? `(${liableOrders.length})` : ''}
+        </button>
       </div>
 
       {/* Orders Table */}
@@ -298,12 +314,53 @@ export default function SupervisorView({ token, user }) {
                         : <span style={{ color: 'var(--clr-text-dim)' }}>Unassigned</span>
                       }
                     </td>
-                    <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span>
+                        {o.is_liable && (
+                          <span style={{ fontSize: 11, background: '#fffbeb', color: '#d97706', border: '1px solid #fcd34d', borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+                            ⚠️ EGP {parseFloat(o.outstanding_amount || 0).toFixed(2)} outstanding
+                          </span>
+                        )}
+                        {o.active_return_status && ['pending_verification','awaiting_second_vote','vote_conflict'].includes(o.active_return_status) && (
+                          <span style={{ fontSize: 11, background: o.active_return_status === 'vote_conflict' ? '#fef2f2' : '#f5f3ff', color: o.active_return_status === 'vote_conflict' ? '#dc2626' : '#7c3aed', border: '1px solid ' + (o.active_return_status === 'vote_conflict' ? '#fca5a5' : '#c4b5fd'), borderRadius: 4, padding: '1px 6px', fontWeight: 700 }}>
+                            {o.active_return_status === 'vote_conflict' ? '⚠️ Vote Conflict' : '🗳️ Vote Needed'}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td style={{ fontSize: 11, color: 'var(--clr-text-dim)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button className="btn btn-sm btn-ghost" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openEditOrderModal(o)}>✏️ Edit</button>
                         <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => setDeleteModal(o)}>🗑️</button>
+                        {o.active_return_id && ['pending_verification','awaiting_second_vote','vote_conflict'].includes(o.active_return_status) && (
+                          <>
+                            <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 11 }}
+                              onClick={async () => {
+                                if (!window.confirm('Kill remaining items for this order? This will cancel them once Inventory agrees.')) return;
+                                try {
+                                  const res = await castVote(o.active_return_id, { vote: 'kill' }, token);
+                                  if (res.action) toast.success('Both parties agreed — items cancelled.');
+                                  else if (res.conflict) toast.error('Vote conflict — Inventory voted differently.');
+                                  else toast.success(`Vote cast. Waiting for ${res.waiting_for}.`);
+                                  fetchData();
+                                } catch (err) { toast.error(err.message); }
+                              }}>🔴 Kill</button>
+                            <button className="btn btn-sm btn-success" style={{ padding: '2px 8px', fontSize: 11 }}
+                              onClick={async () => {
+                                const dId = window.prompt('Driver ID to reassign to (blank = same driver):');
+                                if (dId === null) return;
+                                try {
+                                  const res = await castVote(o.active_return_id, { vote: 'reassign', driver_id: dId ? parseInt(dId) : undefined }, token);
+                                  if (res.action) toast.success('Both agreed — follow-up order created!');
+                                  else if (res.conflict) toast.error('Vote conflict — Inventory voted differently.');
+                                  else toast.success(`Vote cast. Waiting for ${res.waiting_for}.`);
+                                  fetchData();
+                                } catch (err) { toast.error(err.message); }
+                              }}>🟢 Reassign</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

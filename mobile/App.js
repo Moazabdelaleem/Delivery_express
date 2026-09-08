@@ -2721,9 +2721,86 @@ const parseSafeJson = async (res) => {
               <View>
                 <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>{t('assignedDeliveries')}</Text>
                 {renderSearchAndSortHeader()}
-                {filterAndSortOrders(activeOrders).length === 0 ? (
+
+                {/* ── Return to Warehouse Cards ── */}
+                {returnPickups.filter(r => ['pending_pickup','in_transit_back'].includes(r.status)).map(ret => (
+                  <View key={`ret-${ret.id}`} style={{
+                    backgroundColor: '#fffbeb',
+                    borderRadius: 18,
+                    padding: 16,
+                    marginBottom: 14,
+                    borderWidth: 2,
+                    borderColor: '#f59e0b',
+                  }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '900', color: '#92400e' }}>
+                        🔄 {lang === 'ar' ? 'إرجاع للمخزن' : 'Return to Warehouse'}
+                      </Text>
+                      <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#fcd34d' }}>
+                        <Text style={{ color: '#b45309', fontSize: 12, fontWeight: '800' }}>
+                          #{ret.tracking_number || ret.order_id}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={{ fontSize: 13, color: '#92400e', marginBottom: 6, fontWeight: '600' }}>
+                      📍 {ret.client_address || (lang === 'ar' ? 'عنوان المستلم' : 'Recipient address')}
+                    </Text>
+
+                    <Text style={{ fontSize: 12, color: '#78716c', marginBottom: 4 }}>
+                      {lang === 'ar' ? 'السبب: ' : 'Reason: '}{ret.reason || '—'}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#dc2626', marginBottom: 14 }}>
+                      {lang === 'ar' ? 'المبلغ المُرجَع: ' : 'Returned: '}EGP {parseFloat(ret.returned_items_amount || 0).toFixed(2)}
+                    </Text>
+
+                    {ret.status === 'pending_pickup' ? (
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#f59e0b',
+                          borderRadius: 12,
+                          padding: 14,
+                          alignItems: 'center',
+                        }}
+                        onPress={async () => {
+                          try {
+                            const res = await fetch(`${apiBase}/returns/${ret.id}/transit-back`, {
+                              method: 'PATCH',
+                              headers: { Authorization: `Bearer ${token}` }
+                            });
+                            if (!res.ok) {
+                              const errData = await res.json();
+                              Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', errData.error || 'Failed');
+                              return;
+                            }
+                            Alert.alert(
+                              lang === 'ar' ? '✅ تم التأكيد' : '✅ Confirmed',
+                              lang === 'ar' ? 'تم إخطار المخزن أنك في الطريق.' : 'Inventory has been notified you are heading back.'
+                            );
+                            fetchDataRef.current && fetchDataRef.current();
+                          } catch (err) {
+                            Alert.alert('Error', err.message);
+                          }
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>
+                          🚗 {lang === 'ar' ? 'أنا في الطريق للمخزن' : "I'm Heading Back to Warehouse"}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ backgroundColor: '#d1fae5', borderRadius: 12, padding: 12, alignItems: 'center' }}>
+                        <Text style={{ color: '#065f46', fontWeight: '800', fontSize: 14 }}>
+                          ✅ {lang === 'ar' ? 'في الطريق — المخزن ينتظرك' : 'En Route — Inventory is expecting you'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+
+                {filterAndSortOrders(activeOrders).length === 0 && returnPickups.filter(r => ['pending_pickup','in_transit_back'].includes(r.status)).length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
-                ) : (
+                ) : filterAndSortOrders(activeOrders).length === 0 ? null : (
                   filterAndSortOrders(activeOrders).map((item) => {
                     const isExpanded = expandedCardId === item.id;
                     return (

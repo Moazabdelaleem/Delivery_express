@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment } from '../api.js';
+import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment, getAllOrders } from '../api.js';
 import { toast } from '../App.jsx';
 
 export default function FinanceView({ token }) {
@@ -7,6 +7,7 @@ export default function FinanceView({ token }) {
   const [expenses, setExpenses]         = useState(null);
   const [globalAudit, setGlobalAudit]   = useState([]);
   const [pendingPayments, setPendingPayments] = useState([]);
+  const [orders, setOrders]                   = useState([]);
   const [loading, setLoading]           = useState(true);
   const [pullModal, setPullModal]       = useState(null); // driver
   const [topupModal, setTopup]          = useState(null); // driver
@@ -22,16 +23,18 @@ export default function FinanceView({ token }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [wal, exp, aud, pend] = await Promise.all([
+      const [wal, exp, aud, pend, ord] = await Promise.all([
         getAllWallets(token),
         getExpenses(token),
         getGlobalAudit(token).catch(() => []),
-        getPendingPayments(token).catch(() => [])
+        getPendingPayments(token).catch(() => []),
+        getAllOrders(token).catch(() => [])
       ]);
       setWallets(Array.isArray(wal) ? wal : []);
       setExpenses(exp);
       setGlobalAudit(Array.isArray(aud) ? aud : []);
       setPendingPayments(Array.isArray(pend) ? pend : []);
+      setOrders(Array.isArray(ord) ? ord : []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
     } finally {
@@ -135,6 +138,8 @@ export default function FinanceView({ token }) {
 
   const totalCollection = wallets.reduce((s, w) => s + parseFloat(w.collection_balance || 0), 0);
   const totalPocket     = wallets.reduce((s, w) => s + parseFloat(w.pocket_balance || 0), 0);
+  const liableOrders    = orders.filter(o => o.is_liable);
+  const totalLiable     = liableOrders.reduce((s, o) => s + parseFloat(o.outstanding_amount || 0), 0);
 
   if (loading) return (
     <div style={{ padding: '28px 24px' }}>
@@ -185,6 +190,15 @@ export default function FinanceView({ token }) {
           <div className="stat-label">Active Drivers</div>
           <div className="stat-value">{wallets.length}</div>
         </div>
+        <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('liable')}>
+          <div className="stat-label">⚠️ Liable Orders</div>
+          <div className="stat-value" style={{ color: liableOrders.length > 0 ? '#f59e0b' : 'var(--clr-success)' }}>
+            {liableOrders.length}
+          </div>
+          <div className="stat-sub" style={{ color: '#d97706' }}>
+            EGP {totalLiable.toFixed(2)} outstanding
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -199,7 +213,11 @@ export default function FinanceView({ token }) {
           💸 Expenses
         </button>
         <button className={`tab-btn ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
-          🧾 Cash Flow Audit
+          🧧 Cash Flow Audit
+        </button>
+        <button className={`tab-btn ${activeTab === 'liable' ? 'active' : ''}`} onClick={() => setActiveTab('liable')}
+          style={liableOrders.length > 0 ? { color: '#d97706', borderBottomColor: activeTab === 'liable' ? '#d97706' : 'transparent' } : {}}>
+          ⚠️ Liable Orders {liableOrders.length > 0 && <span className="badge badge-warning" style={{ marginLeft: 6 }}>{liableOrders.length}</span>}
         </button>
       </div>
 
@@ -454,6 +472,87 @@ export default function FinanceView({ token }) {
               </table>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB: LIABLE ORDERS */}
+      {activeTab === 'liable' && (
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">⚠️ Orders with Outstanding Cash Liability</span>
+            <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>
+              These orders have confirmed payments less than their total amount.
+            </span>
+          </div>
+          {liableOrders.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">✅</div>
+              <p>No outstanding liabilities — all orders are fully paid.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tracking #</th>
+                    <th>Client / Address</th>
+                    <th>Driver</th>
+                    <th>Order Total</th>
+                    <th>Confirmed Paid</th>
+                    <th>Outstanding</th>
+                    <th>Delivery</th>
+                    <th>Items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liableOrders.map(o => (
+                    <tr key={o.id} style={{ background: '#fffbeb' }}>
+                      <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>
+                        {o.tracking_number}
+                        {o.followup_order_id && (
+                          <span style={{ display: 'block', fontSize: 10, color: '#6b7280' }}>↩ Has follow-up</span>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 12 }}>
+                        <div>{o.client_name || '—'}</div>
+                        <div style={{ color: 'var(--clr-text-muted)' }}>📍 {o.client_address}</div>
+                      </td>
+                      <td style={{ fontSize: 13 }}>{o.delivery_guy_name || '—'}</td>
+                      <td className="amount">EGP {parseFloat(o.order_amount).toFixed(2)}</td>
+                      <td className="amount" style={{ color: 'var(--clr-success)' }}>
+                        EGP {parseFloat(o.confirmed_paid || 0).toFixed(2)}
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 700, color: '#dc2626', background: '#fef2f2',
+                          border: '1px solid #fca5a5', borderRadius: 4, padding: '2px 8px', fontSize: 12 }}>
+                          EGP {parseFloat(o.outstanding_amount || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 11, color: 'var(--clr-text-muted)', textTransform: 'capitalize' }}>
+                        {(o.delivery_outcome || 'pending').replace(/_/g, ' ')}
+                      </td>
+                      <td>
+                        {o.items_resolution && o.items_resolution !== 'null' ? (
+                          <span style={{ fontSize: 11, color: '#7c3aed', background: '#f5f3ff',
+                            border: '1px solid #c4b5fd', borderRadius: 4, padding: '1px 5px' }}>
+                            {o.items_resolution.replace(/_/g, ' ')}
+                          </span>
+                        ) : <span style={{ color: 'var(--clr-text-dim)' }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {liableOrders.length > 0 && (
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--clr-border)', display: 'flex', justifyContent: 'flex-end', gap: 16 }}>
+              <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>{liableOrders.length} order(s)</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>
+                Total Outstanding: EGP {totalLiable.toFixed(2)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
