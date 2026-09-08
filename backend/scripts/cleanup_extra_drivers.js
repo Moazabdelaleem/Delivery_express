@@ -41,9 +41,21 @@ async function cleanupExtraDrivers() {
 
       const extraIds = extraDrivers.rows.map(d => d.id);
 
+      // Reassign or clean up FK references in foreign tables pointing to extra driver users
+      await db.query(`UPDATE orders SET delivery_guy_id = $1 WHERE delivery_guy_id = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE order_status_history SET changed_by = $1 WHERE changed_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE order_payments SET recorded_by = $1 WHERE recorded_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE order_payments SET confirmed_by = $1 WHERE confirmed_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE returns SET initiated_by = $1 WHERE initiated_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE returns SET verified_by = $1 WHERE verified_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE order_attachments SET uploaded_by = $1 WHERE uploaded_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE order_feedback SET recorded_by = $1 WHERE recorded_by = ANY($2);`, [samiId, extraIds]);
+      await db.query(`UPDATE wallet_transactions SET performed_by = $1 WHERE performed_by = ANY($2);`, [samiId, extraIds]);
+
       // Delete associated wallet & shift logs for extra drivers
       await db.query(`DELETE FROM wallet_transactions WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM collection_wallets WHERE delivery_guy_id = ANY($1);`, [extraIds]);
+      await db.query(`DELETE FROM pocket_expenses WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM pocket_wallets WHERE delivery_guy_id = ANY($1);`, [extraIds]);
       await db.query(`DELETE FROM driver_shifts WHERE delivery_guy_id = ANY($1);`, [extraIds]);
 

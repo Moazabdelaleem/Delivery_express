@@ -147,6 +147,12 @@ export const rejectPayment = (paymentId, token) =>
     method: 'PUT', headers: headers(token)
   }).then(handle);
 
+export const settleOrderLiability = (orderId, payload, token) =>
+  fetch(`${BASE_URL}/orders/${orderId}/settle-liability`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
 // ---- Returns ----
 export const createReturn = (payload, token) =>
   fetch(`${BASE_URL}/returns`, {
@@ -173,15 +179,32 @@ export const transitBack = (returnId, token) =>
     method: 'PATCH', headers: headers(token)
   }).then(handle);
 
-export const receiveItems = (returnId, token) =>
+export const receiveItems = (returnId, payload, token) =>
   fetch(`${BASE_URL}/returns/${returnId}/receive`, {
-    method: 'PATCH', headers: headers(token)
+    method: 'PATCH', headers: headers(token),
+    body: JSON.stringify(payload || {})
   }).then(handle);
 
 export const castVote = (returnId, payload, token) =>
   fetch(`${BASE_URL}/returns/${returnId}/vote`, {
     method: 'POST', headers: headers(token),
     body: JSON.stringify(payload)
+  }).then(handle);
+
+export const managerOverrideReturn = (returnId, payload, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/manager-override`, {
+    method: 'POST', headers: headers(token),
+    body: JSON.stringify(payload)
+  }).then(handle);
+
+export const forceTransitReturn = (returnId, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/force-transit`, {
+    method: 'PATCH', headers: headers(token)
+  }).then(handle);
+
+export const cancelReturn = (returnId, token) =>
+  fetch(`${BASE_URL}/returns/${returnId}/cancel-return`, {
+    method: 'POST', headers: headers(token)
   }).then(handle);
 
 

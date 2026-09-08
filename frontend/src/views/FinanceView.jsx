@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment, getAllOrders } from '../api.js';
+import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment, getAllOrders, settleOrderLiability } from '../api.js';
 import { toast } from '../App.jsx';
+import { useWindowFocus } from '../useWindowFocus.js';
 
 export default function FinanceView({ token }) {
   const [wallets, setWallets]           = useState([]);
@@ -13,6 +14,9 @@ export default function FinanceView({ token }) {
   const [topupModal, setTopup]          = useState(null); // driver
   const [ledgerModal, setLedgerModal]   = useState(null); // driver
   const [confirmActionModal, setConfirmActionModal] = useState(null); // { payment, action: 'confirm' | 'reject' }
+  const [settleModal, setSettleModal]   = useState(null); // order
+  const [settleType, setSettleType]     = useState('bank_transfer');
+  const [settleNotes, setSettleNotes]   = useState('');
   const [ledgerData, setLedgerData]     = useState(null);
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [pullAmt, setPullAmt]           = useState('');
@@ -37,10 +41,25 @@ export default function FinanceView({ token }) {
       setOrders(Array.isArray(ord) ? ord : []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
   }, [token]);
+
+  useWindowFocus(fetchData);
+
+  const handleSettleLiability = async () => {
+    if (!settleModal) return;
+    setSub(true);
+    try {
+      await settleOrderLiability(settleModal.id, { settlement_type: settleType, notes: settleNotes }, token);
+      toast.success(`Liability for order #${settleModal.tracking_number} settled via ${settleType.replace(/_/g, ' ')}.`);
+      setSettleModal(null);
+      setSettleNotes('');
+      fetchData();
+    } catch (err) {
+      toast.error('Failed to settle liability: ' + err.message);
+    } finally {
+      setSub(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -502,6 +521,7 @@ export default function FinanceView({ token }) {
                     <th>Outstanding</th>
                     <th>Delivery</th>
                     <th>Items</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -538,6 +558,15 @@ export default function FinanceView({ token }) {
                             {o.items_resolution.replace(/_/g, ' ')}
                           </span>
                         ) : <span style={{ color: 'var(--clr-text-dim)' }}>—</span>}
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-success btn-sm"
+                          onClick={() => setSettleModal(o)}
+                          style={{ fontSize: 11, whiteSpace: 'nowrap' }}
+                        >
+                          💳 Settle Liability
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -739,6 +768,50 @@ export default function FinanceView({ token }) {
                 }
               >
                 {confirmActionModal.action === 'confirm' ? 'Confirm Payment' : 'Reject Payment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Direct Liability Settlement Modal */}
+      {settleModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2 className="modal-title">💳 Settle Order Liability</h2>
+            <p style={{ color: 'var(--clr-text-muted)', fontSize: 13, marginBottom: 16 }}>
+              Order <strong>#{settleModal.tracking_number}</strong> — Outstanding: <strong style={{ color: '#dc2626' }}>EGP {parseFloat(settleModal.outstanding_amount || 0).toFixed(2)}</strong>
+            </p>
+            <div className="form-group" style={{ marginBottom: 14 }}>
+              <label className="form-label">Settlement Method</label>
+              <select
+                className="form-input"
+                value={settleType}
+                onChange={(e) => setSettleType(e.target.value)}
+              >
+                <option value="bank_transfer">🏦 Direct Bank / Instapay Transfer</option>
+                <option value="direct_cash">💵 Direct Cash Collected by Supervisor/HQ</option>
+                <option value="driver_handover">🚗 Driver Daily Cash Handover Allocation</option>
+                <option value="waiver">🤝 Management Approved Waiver / Write-off</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label className="form-label">Notes & Reference Details</label>
+              <textarea
+                className="form-input"
+                rows="3"
+                placeholder="Enter transaction ref number, bank receipt notes, or waiver justification..."
+                value={settleNotes}
+                onChange={(e) => setSettleNotes(e.target.value)}
+              />
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setSettleModal(null)}>Cancel</button>
+              <button
+                className="btn btn-success"
+                disabled={submitting}
+                onClick={handleSettleLiability}
+              >
+                {submitting ? <span className="spinner" /> : '✅ Confirm Settlement'}
               </button>
             </div>
           </div>

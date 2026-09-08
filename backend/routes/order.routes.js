@@ -52,4 +52,7 @@ router.post('/:id/feedback', authMiddleware, roleCheck(['delivery_guy']), feedba
 // Get customer voice feedback for order - All authenticated roles
 router.get('/:id/feedback', authMiddleware, feedbackController.getOrderFeedback);
 
+// Finance / Manager / Admin: Settle order liability directly
+router.post('/:id/settle-liability', authMiddleware, roleCheck(['finance', 'manager', 'admin']), orderController.settleOrderLiability);
+
 module.exports = router;

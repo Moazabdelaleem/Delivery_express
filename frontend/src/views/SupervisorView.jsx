@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary, castVote } from '../api.js';
+import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary, castVote, cancelReturn, forceTransitReturn } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
+import { useWindowFocus } from '../useWindowFocus.js';
 
 export default function SupervisorView({ token, user }) {
   const [orders, setOrders]                 = useState([]);
@@ -52,6 +53,29 @@ export default function SupervisorView({ token, user }) {
       setLoading(false);
     }
   }, [token]);
+
+  useWindowFocus(fetchData);
+
+  const handleCancelReturn = async (returnId) => {
+    if (!window.confirm('Cancel return and send order back out on delivery route?')) return;
+    try {
+      await cancelReturn(returnId, token);
+      toast.success('Return cancelled — order restored to active delivery state.');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleForceTransit = async (returnId) => {
+    try {
+      await forceTransitReturn(returnId, token);
+      toast.success('Return manually marked as heading back to warehouse.');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -334,6 +358,26 @@ export default function SupervisorView({ token, user }) {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <button className="btn btn-sm btn-ghost" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => openEditOrderModal(o)}>✏️ Edit</button>
                         <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => setDeleteModal(o)}>🗑️</button>
+                        {o.active_return_id && (
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            style={{ padding: '2px 6px', fontSize: 11, color: 'var(--clr-warning)' }}
+                            title="Customer turnaround — cancel return and send back out"
+                            onClick={() => handleCancelReturn(o.active_return_id)}
+                          >
+                            ↩️ Turnaround
+                          </button>
+                        )}
+                        {o.active_return_id && o.active_return_status === 'pending_pickup' && (
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            style={{ padding: '2px 6px', fontSize: 11 }}
+                            title="Force mark as heading back to warehouse"
+                            onClick={() => handleForceTransit(o.active_return_id)}
+                          >
+                            ⚡ Force Transit
+                          </button>
+                        )}
                         {o.active_return_id && ['pending_verification','awaiting_second_vote','vote_conflict'].includes(o.active_return_status) && (
                           <>
                             <button className="btn btn-sm btn-danger" style={{ padding: '2px 8px', fontSize: 11 }}

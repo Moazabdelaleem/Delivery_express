@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getInventoryQueue, inventoryHandoff, getReturnsQueue, verifyReturn, receiveItems, castVote } from '../api.js';
+import { getInventoryQueue, inventoryHandoff, getReturnsQueue, verifyReturn, receiveItems, castVote, forceTransitReturn } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
+import { useWindowFocus } from '../useWindowFocus.js';
 
 const HANDOFF_STATUSES = ['assigned', 'notified_inventory'];
 
@@ -56,7 +57,9 @@ function VotePanel({ ret, myRole, onVote, submitting }) {
       <p style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 10 }}>
         <strong>Items returned:</strong> EGP {parseFloat(ret.returned_items_amount || 0).toFixed(2)}
         {ret.returned_quantity > 0 && ` · ${ret.returned_quantity} items`}
+        {ret.damaged_missing_qty > 0 && <span style={{ color: '#dc2626', fontWeight: 700 }}> · ⚠️ {ret.damaged_missing_qty} missing/damaged</span>}
         <br /><strong>Reason:</strong> {ret.reason}
+        {ret.condition_notes && <><br /><strong>Notes:</strong> {ret.condition_notes}</>}
       </p>
 
       {!showDriverPick ? (
@@ -116,6 +119,9 @@ export default function InventoryView({ token }) {
   const [noteModal, setNoteModal]   = useState(null);
   const [note, setNote]             = useState('');
   const [handoffAtt, setHandoffAtt] = useState(null);
+  const [receiveModal, setReceiveModal] = useState(null); // return object
+  const [dmgQty, setDmgQty]         = useState('0');
+  const [condNotes, setCondNotes]   = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -131,6 +137,8 @@ export default function InventoryView({ token }) {
       setLoading(false);
     }
   }, [token]);
+
+  useWindowFocus(fetchData);
 
   useEffect(() => {
     fetchData();
@@ -158,16 +166,38 @@ export default function InventoryView({ token }) {
     }
   };
 
-  const handleReceive = async (returnId) => {
+  const confirmReceive = async (e) => {
+    e.preventDefault();
+    if (!receiveModal) return;
+    const returnId = receiveModal.id;
     setSub(s => ({ ...s, [`rcv_${returnId}`]: true }));
     try {
-      await receiveItems(returnId, token);
+      await receiveItems(returnId, {
+        damaged_missing_qty: parseInt(dmgQty) || 0,
+        condition_notes: condNotes.trim() || undefined
+      }, token);
       toast.success('Items received at warehouse. Both parties notified to vote.');
+      setReceiveModal(null);
+      setDmgQty('0');
+      setCondNotes('');
       fetchData();
     } catch (err) {
       toast.error(err.message);
     } finally {
       setSub(s => { const n = { ...s }; delete n[`rcv_${returnId}`]; return n; });
+    }
+  };
+
+  const handleForceTransit = async (returnId) => {
+    setSub(s => ({ ...s, [`ft_${returnId}`]: true }));
+    try {
+      await forceTransitReturn(returnId, token);
+      toast.success('Return manually marked as heading back to warehouse.');
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(s => { const n = { ...s }; delete n[`ft_${returnId}`]; return n; });
     }
   };
 
@@ -362,15 +392,27 @@ export default function InventoryView({ token }) {
                     </div>
 
                     {/* "Receive Items" button for in_transit_back */}
-                    {needsReceive && (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        style={{ width: '100%' }}
-                        disabled={submitting[`rcv_${ret.id}`]}
-                        onClick={() => handleReceive(ret.id)}
-                      >
-                        📦 Mark Items as Received at Warehouse
-                      </button>
+                    {(needsReceive || ret.status === 'pending_pickup') && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ width: '100%' }}
+                          disabled={submitting[`rcv_${ret.id}`]}
+                          onClick={() => setReceiveModal(ret)}
+                        >
+                          📦 Receive Items at Warehouse
+                        </button>
+                        {ret.status === 'pending_pickup' && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ width: '100%', fontSize: 11 }}
+                            disabled={submitting[`ft_${ret.id}`]}
+                            onClick={() => handleForceTransit(ret.id)}
+                          >
+                            ⚡ Force Mark Heading Back
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     {/* Vote panel for pending_verification / awaiting_second_vote / vote_conflict */}
@@ -432,6 +474,46 @@ export default function InventoryView({ token }) {
                   disabled={noteModal.handed && !handoffAtt}
                 >
                   {noteModal.handed ? 'Confirm Handoff' : 'Confirm Failure'}
+                </button>
+              </div>
+            </form>
+      {/* Receive Items Modal */}
+      {receiveModal && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2 className="modal-title">📦 Receive Returned Items at Warehouse</h2>
+            <p style={{ color: 'var(--clr-text-muted)', fontSize: 13, marginBottom: 16 }}>
+              Order <strong>#{receiveModal.tracking_number}</strong> — {receiveModal.return_type === 'full' ? 'Full Return' : 'Partial Return'}
+            </p>
+            <form onSubmit={confirmReceive}>
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label">⚠️ Damaged or Missing Items Count</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  value={dmgQty}
+                  onChange={(e) => setDmgQty(e.target.value)}
+                  placeholder="0 (all good items returned)"
+                />
+                <span style={{ fontSize: 11, color: 'var(--clr-text-muted)' }}>
+                  Enter number of items that were missing or damaged upon inspection (0 if all returned intact).
+                </span>
+              </div>
+              <div className="form-group" style={{ marginBottom: 20 }}>
+                <label className="form-label">Inspection & Condition Notes</label>
+                <textarea
+                  className="form-input"
+                  rows="3"
+                  value={condNotes}
+                  onChange={(e) => setCondNotes(e.target.value)}
+                  placeholder="Describe physical condition, package damage, or missing item details..."
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn btn-ghost" onClick={() => setReceiveModal(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting[`rcv_${receiveModal.id}`]}>
+                  {submitting[`rcv_${receiveModal.id}`] ? <span className="spinner" /> : '✅ Confirm Physical Receipt'}
                 </button>
               </div>
             </form>

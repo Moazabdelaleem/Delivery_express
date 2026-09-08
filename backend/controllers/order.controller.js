@@ -730,24 +730,31 @@ exports.getAllOrders = async (req, res) => {
               s.name as supervisor_name,
               d.name as delivery_guy_name, d.online_status as delivery_guy_status,
               h.name as inventory_handed_by_name,
+              u_st.name as settled_by_name,
               COALESCE(p.confirmed_paid, 0.00) as confirmed_paid,
               COALESCE(p.pending_paid, 0.00) as pending_paid,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_balance,
-              -- Liable: any order where confirmed payments < order amount
-              CASE WHEN GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) > 0
+              CASE WHEN o.is_settled = true THEN 0.00
+                   ELSE GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) END as outstanding_balance,
+              -- Liable: any order where confirmed payments < order amount AND not directly settled
+              CASE WHEN o.is_settled = true THEN false
+                   WHEN GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) > 0
                    THEN true ELSE false END as is_liable,
-              GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) as outstanding_amount,
+              CASE WHEN o.is_settled = true THEN 0.00
+                   ELSE GREATEST(0, CAST(o.order_amount AS NUMERIC) - COALESCE(p.confirmed_paid, 0.00)) END as outstanding_amount,
               -- Active return info for this order
               r.id as active_return_id,
               r.status as active_return_status,
               r.return_type as active_return_type,
               r.inventory_vote,
               r.supervisor_vote,
-              r.reassign_driver_id
+              r.reassign_driver_id,
+              r.damaged_missing_qty,
+              r.condition_notes
        FROM orders o
        LEFT JOIN users s ON o.supervisor_id = s.id
        LEFT JOIN users d ON o.delivery_guy_id = d.id
        LEFT JOIN users h ON o.inventory_handoff_by = h.id
+       LEFT JOIN users u_st ON o.settled_by = u_st.id
        LEFT JOIN (
          SELECT order_id,
                 SUM(CASE WHEN confirmation_status = 'confirmed' THEN amount ELSE 0 END) as confirmed_paid,
@@ -756,7 +763,7 @@ exports.getAllOrders = async (req, res) => {
          GROUP BY order_id
        ) p ON p.order_id = o.id
        LEFT JOIN LATERAL (
-         SELECT id, status, return_type, inventory_vote, supervisor_vote, reassign_driver_id
+         SELECT id, status, return_type, inventory_vote, supervisor_vote, reassign_driver_id, damaged_missing_qty, condition_notes
          FROM returns
          WHERE order_id = o.id
            AND status NOT IN ('cancelled','reassigned','verified','rejected')
@@ -768,6 +775,60 @@ exports.getAllOrders = async (req, res) => {
   } catch (err) {
     console.error('Error fetching all orders:', err);
     res.status(500).json({ error: 'Failed to fetch orders.' });
+  }
+};
+
+// Settle Order Liability directly (Finance / Admin / Manager)
+exports.settleOrderLiability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { settlement_type, notes } = req.body;
+
+    if (!['finance', 'admin', 'manager'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only Finance, Managers, or Admins can settle order liabilities.' });
+    }
+    if (!settlement_type) {
+      return res.status(400).json({ error: 'settlement_type is required (e.g., bank_transfer, direct_cash, driver_handover, waiver).' });
+    }
+
+    const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    const order = orderRes.rows[0];
+
+    const updatedRes = await db.query(
+      `UPDATE orders
+       SET is_settled = TRUE,
+           settlement_type = $1,
+           settlement_notes = $2,
+           settled_by = $3,
+           settled_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $4 RETURNING *`,
+      [settlement_type.trim(), notes ? notes.trim() : null, req.user.id, id]
+    );
+
+    await db.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+       VALUES ($1, $2, $2, $3, $4)`,
+      [id, order.status, req.user.id, `Liability settled directly via ${settlement_type}${notes ? `: ${notes}` : ''}`]
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role_finance').to('role_manager').to('role_supervisor').emit('order_updated', {
+        order_id: id,
+        is_settled: true,
+        settlement_type
+      });
+    }
+
+    res.json({ message: 'Order liability settled successfully.', order: updatedRes.rows[0] });
+  } catch (err) {
+    console.error('Error settling order liability:', err);
+    res.status(500).json({ error: err.message || 'Server error settling liability.' });
   }
 };
 

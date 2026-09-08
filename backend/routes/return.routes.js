@@ -25,4 +25,13 @@ router.post('/:return_id/vote', authMiddleware, roleCheck(['inventory', 'supervi
 // Legacy: verify/reject return — Inventory (kept for backward compat)
 router.put('/:return_id/verify', authMiddleware, roleCheck(['inventory']), returnController.verifyReturn);
 
+// Manager / Admin: override vote conflict tie-breaker
+router.post('/:return_id/manager-override', authMiddleware, roleCheck(['manager', 'admin']), returnController.managerOverride);
+
+// Supervisor / Inventory / Manager: force transit to warehouse
+router.patch('/:return_id/force-transit', authMiddleware, roleCheck(['supervisor', 'inventory', 'manager']), returnController.forceTransit);
+
+// Supervisor / Manager: cancel return (customer turnaround mid-transit)
+router.post('/:return_id/cancel-return', authMiddleware, roleCheck(['supervisor', 'manager']), returnController.cancelReturn);
+
 module.exports = router;

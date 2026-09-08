@@ -27,44 +27,57 @@ const getClient = async () => {
   return client;
 };
 
-// Auto-ensure required schema columns, constraints, and performance indexes exist
-(async () => {
-  try {
-    if (pgPool) {
-      await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);');
-      await pgPool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);');
-      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
-      await pgPool.query('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
-      await pgPool.query('ALTER TABLE pocket_expenses ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL;');
-      // Tracking number uniqueness
-      await pgPool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tracking_number_unique ON orders (tracking_number);');
-      // C3 Performance indexes — hot query paths
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_delivery_guy ON orders(delivery_guy_id);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_supervisor ON orders(supervisor_id);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_pocket_expenses_driver ON pocket_expenses(delivery_guy_id);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_order ON order_payments(order_id);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_recorded_by ON order_payments(recorded_by);');
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_order_payments_status ON order_payments(confirmation_status);');
-      // Partial delivery lifecycle columns
-      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS items_resolution VARCHAR(30) DEFAULT NULL;');
-      await pgPool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS followup_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL;');
-      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS inventory_vote VARCHAR(20) DEFAULT NULL;');
-      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS supervisor_vote VARCHAR(20) DEFAULT NULL;');
-      await pgPool.query('ALTER TABLE returns ADD COLUMN IF NOT EXISTS reassign_driver_id INTEGER REFERENCES users(id) ON DELETE SET NULL;');
-      // Index for liable orders query
-      await pgPool.query('CREATE INDEX IF NOT EXISTS idx_orders_items_resolution ON orders(items_resolution);');
-    }
-  } catch (err) {
-    console.error('Schema auto-patch note:', err.message);
-  }
-})();
+const initSchema = async () => {
+  if (!pgPool) return;
+  const safeQuery = async (q) => {
+    try { await pgPool.query(q); } catch (e) { /* ignore individual migration notes */ }
+  };
 
+  await safeQuery('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);');
+  await safeQuery('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;');
+  await safeQuery('ALTER TABLE pocket_wallets DROP CONSTRAINT IF EXISTS pocket_wallets_current_balance_check;');
+  await safeQuery('ALTER TABLE pocket_expenses ADD COLUMN IF NOT EXISTS order_id UUID REFERENCES orders(id) ON DELETE SET NULL;');
+  await safeQuery('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_tracking_number_unique ON orders (tracking_number);');
 
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_orders_delivery_guy ON orders(delivery_guy_id);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_orders_supervisor ON orders(supervisor_id);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_pocket_expenses_driver ON pocket_expenses(delivery_guy_id);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_order_payments_order ON order_payments(order_id);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_order_payments_recorded_by ON order_payments(recorded_by);');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_order_payments_status ON order_payments(confirmation_status);');
+
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS items_resolution VARCHAR(30) DEFAULT NULL;');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS followup_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS inventory_vote VARCHAR(20) DEFAULT NULL;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS supervisor_vote VARCHAR(20) DEFAULT NULL;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS reassign_driver_id UUID REFERENCES users(id) ON DELETE SET NULL;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();');
+
+  // Drop old status constraint to support new return lifecycle statuses (in_transit_back, awaiting_second_vote, vote_conflict, cancelled)
+  await safeQuery('ALTER TABLE returns DROP CONSTRAINT IF EXISTS returns_status_check;');
+
+  // Edge cases & liability settlement columns
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS damaged_missing_qty INT DEFAULT 0;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS condition_notes TEXT;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS manager_override_by UUID REFERENCES users(id) ON DELETE SET NULL;');
+  await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS manager_override_at TIMESTAMPTZ;');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_settled BOOLEAN DEFAULT FALSE;');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS settlement_type VARCHAR(50);');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS settlement_notes TEXT;');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS settled_by UUID REFERENCES users(id) ON DELETE SET NULL;');
+  await safeQuery('ALTER TABLE orders ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;');
+  await safeQuery('CREATE INDEX IF NOT EXISTS idx_orders_items_resolution ON orders(items_resolution);');
+};
+
+const schemaPromise = initSchema();
 
 module.exports = {
   query,
   getClient,
-  pool: pgPool
+  pool: pgPool,
+  initSchema,
+  schemaPromise
 };

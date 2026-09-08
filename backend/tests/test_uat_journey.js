@@ -332,6 +332,15 @@ async function runUATJourney() {
   } catch (err) {
     console.error('\n❌ UAT TEST JOURNEY FAILED:', err.stack || err.message);
     process.exit(1);
+  } finally {
+    try {
+      // Clean up extra temporary test users created during UAT run
+      const tempUsernames = [execUsername, `my_driver_${uid}`, `my_inventory_${uid}`, `my_supervisor_${uid}`, `my_finance_${uid}`];
+      await pool.query('DELETE FROM users WHERE username = ANY($1)', [tempUsernames]);
+      console.log('🧹 Cleaned up temporary UAT test user accounts from database.');
+    } catch (e) {
+      // Ignore cleanup error if pool ended
+    }
   }
 }
 

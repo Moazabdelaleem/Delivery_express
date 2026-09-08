@@ -19,10 +19,11 @@ async function executeAgreedAction(returnRec, vote, io, bufferEvent) {
       `UPDATE orders SET items_resolution = 'cancelled', updated_at = NOW() WHERE id = $1`,
       [order_id]
     );
+    const actorUserId = returnRec.manager_override_by || returnRec.initiated_by || order.supervisor_id;
     await db.query(
       `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
        VALUES ($1, $2, $2, $3, $4)`,
-      [order_id, order.status, null, 'Both parties agreed: remaining items cancelled']
+      [order_id, order.status, actorUserId, 'Return resolution executed: remaining items cancelled']
     );
     if (io) {
       io.to('role_supervisor').to('role_inventory').to('role_manager').to('role_finance')
@@ -224,6 +225,7 @@ exports.transitBack = async (req, res) => {
 exports.receiveItems = async (req, res) => {
   try {
     const { return_id } = req.params;
+    const { damaged_missing_qty, condition_notes } = req.body || {};
 
     const returnRes = await db.query(
       `SELECT r.*, o.tracking_number FROM returns r JOIN orders o ON r.order_id = o.id WHERE r.id = $1`,
@@ -235,9 +237,17 @@ exports.receiveItems = async (req, res) => {
     if (!['in_transit_back', 'pending_pickup'].includes(ret.status))
       return res.status(400).json({ error: `Cannot receive from status '${ret.status}'.` });
 
+    const dmgQty = parseInt(damaged_missing_qty) || 0;
+    const notes = condition_notes ? condition_notes.trim() : null;
+
     await db.query(
-      `UPDATE returns SET status = 'pending_verification', updated_at = NOW() WHERE id = $1`,
-      [return_id]
+      `UPDATE returns
+       SET status = 'pending_verification',
+           damaged_missing_qty = $1,
+           condition_notes = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [dmgQty, notes, return_id]
     );
     await db.query(
       `UPDATE orders SET items_resolution = 'received', updated_at = NOW() WHERE id = $1`,
@@ -246,13 +256,13 @@ exports.receiveItems = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      const payload = { return_id, order_id: ret.order_id, status: 'pending_verification' };
+      const payload = { return_id, order_id: ret.order_id, status: 'pending_verification', damaged_missing_qty: dmgQty };
       io.to('role_inventory').to('role_supervisor').to('role_manager').emit('return_updated', payload);
     }
 
     sendPushToRole('supervisor',
       '📦 Items Back at Warehouse',
-      `Return for order #${ret.tracking_number} received. Please coordinate with Inventory on next steps.`,
+      `Return for order #${ret.tracking_number} received${dmgQty > 0 ? ` (${dmgQty} item(s) missing/damaged)` : ''}. Please vote on next steps.`,
       { order_id: ret.order_id, return_id }
     );
     sendPushToRole('inventory',
@@ -261,9 +271,136 @@ exports.receiveItems = async (req, res) => {
       { order_id: ret.order_id, return_id }
     );
 
-    res.json({ message: 'Items received at warehouse. Awaiting Kill/Reassign decision from both parties.' });
+    res.json({ message: 'Items received at warehouse. Awaiting Kill/Reassign decision from both parties.', damaged_missing_qty: dmgQty });
   } catch (err) {
     console.error('Error in receiveItems:', err);
+    res.status(500).json({ error: err.message || 'Server error.' });
+  }
+};
+
+// ─── Manager Override (Manager / Admin Tie-Breaker) ───────────────────────────
+
+exports.managerOverride = async (req, res) => {
+  try {
+    const { return_id } = req.params;
+    const { vote, driver_id } = req.body;
+
+    if (!['manager', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only Managers or Admins can perform a vote override.' });
+    }
+    if (!['kill', 'reassign'].includes(vote)) {
+      return res.status(400).json({ error: "Vote must be 'kill' or 'reassign'." });
+    }
+
+    const returnRes = await db.query(
+      `SELECT r.*, o.tracking_number, o.delivery_guy_id
+       FROM returns r JOIN orders o ON r.order_id = o.id
+       WHERE r.id = $1`,
+      [return_id]
+    );
+    if (returnRes.rows.length === 0) return res.status(404).json({ error: 'Return record not found.' });
+
+    const ret = returnRes.rows[0];
+    const targetDriver = vote === 'reassign' ? (driver_id || ret.reassign_driver_id || ret.delivery_guy_id) : null;
+
+    const updatedRes = await db.query(
+      `UPDATE returns
+       SET manager_override_by = $1,
+           manager_override_at = NOW(),
+           reassign_driver_id = $2,
+           updated_at = NOW()
+       WHERE id = $3 RETURNING *`,
+      [req.user.id, targetDriver, return_id]
+    );
+
+    const updatedRet = updatedRes.rows[0];
+    const io = req.app.get('io');
+    const bufferEvent = req.app.get('bufferEvent');
+
+    await executeAgreedAction(updatedRet, vote, io, bufferEvent);
+
+    res.json({
+      message: `Manager override executed successfully (${vote.toUpperCase()}).`,
+      action: vote,
+      override_by: req.user.name
+    });
+  } catch (err) {
+    console.error('Error in managerOverride:', err);
+    res.status(500).json({ error: err.message || 'Server error during manager override.' });
+  }
+};
+
+// ─── Force Transit to Warehouse (Supervisor / Inventory) ────────────────────
+
+exports.forceTransit = async (req, res) => {
+  try {
+    const { return_id } = req.params;
+
+    const returnRes = await db.query(
+      `SELECT r.*, o.tracking_number FROM returns r JOIN orders o ON r.order_id = o.id WHERE r.id = $1`,
+      [return_id]
+    );
+    if (returnRes.rows.length === 0) return res.status(404).json({ error: 'Return not found.' });
+
+    const ret = returnRes.rows[0];
+    if (ret.status !== 'pending_pickup') {
+      return res.status(400).json({ error: `Cannot force transit from status '${ret.status}'. Must be 'pending_pickup'.` });
+    }
+
+    await db.query(
+      `UPDATE returns SET status = 'in_transit_back', updated_at = NOW() WHERE id = $1`,
+      [return_id]
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role_inventory').to('role_supervisor').to('role_manager')
+        .emit('return_updated', { return_id, order_id: ret.order_id, status: 'in_transit_back' });
+    }
+
+    res.json({ message: 'Return manually marked as heading back to warehouse.' });
+  } catch (err) {
+    console.error('Error in forceTransit:', err);
+    res.status(500).json({ error: err.message || 'Server error.' });
+  }
+};
+
+// ─── Cancel Return / Customer Turnaround (Supervisor) ───────────────────────
+
+exports.cancelReturn = async (req, res) => {
+  try {
+    const { return_id } = req.params;
+
+    const returnRes = await db.query(
+      `SELECT r.*, o.tracking_number, o.status as order_status FROM returns r JOIN orders o ON r.order_id = o.id WHERE r.id = $1`,
+      [return_id]
+    );
+    if (returnRes.rows.length === 0) return res.status(404).json({ error: 'Return not found.' });
+
+    const ret = returnRes.rows[0];
+    if (['cancelled', 'reassigned'].includes(ret.status)) {
+      return res.status(400).json({ error: `Return is already finalized as '${ret.status}'.` });
+    }
+
+    // Cancel return record and revert order items resolution
+    await db.query(`UPDATE returns SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [return_id]);
+    await db.query(`UPDATE orders SET items_resolution = NULL, updated_at = NOW() WHERE id = $1`, [ret.order_id]);
+
+    await db.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+       VALUES ($1, $2, $2, $3, 'Return cancelled by supervisor — customer turnaround')`,
+      [ret.order_id, ret.order_status, req.user.id]
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role_inventory').to('role_supervisor').to('role_manager')
+        .emit('return_updated', { return_id, order_id: ret.order_id, status: 'cancelled' });
+    }
+
+    res.json({ message: 'Return cancelled successfully. Order returned to normal delivery state.' });
+  } catch (err) {
+    console.error('Error in cancelReturn:', err);
     res.status(500).json({ error: err.message || 'Server error.' });
   }
 };
@@ -473,13 +610,15 @@ exports.getReturnsQueue = async (req, res) => {
              u_init.name as initiated_by_name, u_init.role as initiated_by_role,
              u_ver.name as verified_by_name,
              u_drv.name as driver_name, u_drv.phone as driver_phone,
-             u_rd.name as reassign_driver_name
+             u_rd.name as reassign_driver_name,
+             u_mo.name as manager_override_by_name
       FROM returns r
       JOIN orders o ON r.order_id = o.id
       JOIN users u_init ON r.initiated_by = u_init.id
       LEFT JOIN users u_ver ON r.verified_by = u_ver.id
       LEFT JOIN users u_drv ON o.delivery_guy_id = u_drv.id
       LEFT JOIN users u_rd ON r.reassign_driver_id = u_rd.id
+      LEFT JOIN users u_mo ON r.manager_override_by = u_mo.id
     `;
 
     const queryParams = [];

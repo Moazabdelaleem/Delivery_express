@@ -1,17 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger, getShiftSummary } from '../api.js';
+import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger, getShiftSummary, getReturnsQueue, managerOverrideReturn, getUsersByRole } from '../api.js';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
+import { useWindowFocus } from '../useWindowFocus.js';
 
 export default function ManagerView({ token }) {
   const [orders, setOrders]       = useState([]);
   const [wallets, setWallets]     = useState([]);
   const [pending, setPending]     = useState([]);
+  const [returns, setReturns]     = useState([]);
+  const [drivers, setDrivers]     = useState([]);
   const [shiftSummaries, setShiftSummaries] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeTab, setActiveTab] = useState('orders');
   const [submitting, setSub]      = useState({});
   const [filter, setFilter]       = useState('all');
+  const [reassignDriverMap, setReassignDriverMap] = useState({});
 
   const [ledgerModal, setLedgerModal] = useState(null); // driver object
   const [ledgerData, setLedgerData] = useState(null);
@@ -19,22 +23,28 @@ export default function ManagerView({ token }) {
 
   const fetchData = useCallback(async () => {
     try {
-      const [ord, wal, pend, shSummary] = await Promise.all([
+      const [ord, wal, pend, shSummary, retQueue, drvList] = await Promise.all([
         getAllOrders(token),
         getAllWallets(token),
         getPendingUsers(token),
-        getShiftSummary(null, token).catch(() => ({ summaries: [] }))
+        getShiftSummary(null, token).catch(() => ({ summaries: [] })),
+        getReturnsQueue(null, token).catch(() => ({ returns: [] })),
+        getUsersByRole('delivery_guy', token).catch(() => [])
       ]);
       setOrders(ord);
       setWallets(Array.isArray(wal) ? wal : []);
       setPending(pend);
       setShiftSummaries(shSummary.summaries || []);
+      setReturns(retQueue.returns || []);
+      setDrivers(drvList || []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
     } finally {
       setLoading(false);
     }
   }, [token]);
+
+  useWindowFocus(fetchData);
 
   useEffect(() => {
     fetchData();
@@ -90,11 +100,6 @@ export default function ManagerView({ token }) {
     }
   };
 
-  const counts = orders.reduce((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
-    return acc;
-  }, {});
-
   const totalRevenue = orders
     .filter(o => o.status === 'cash_cleared')
     .reduce((s, o) => s + parseFloat(o.order_amount || 0), 0);
@@ -129,6 +134,22 @@ export default function ManagerView({ token }) {
           <p className="section-sub">Full system overview — read-only except approvals and system actions</p>
         </div>
       </div>
+
+      {/* Conflict / Pending Banners */}
+      {conflicts.length > 0 && (
+        <div style={{
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: 'var(--r-md)', padding: '12px 16px', marginBottom: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+        }}>
+          <span style={{ color: 'var(--clr-danger)', fontSize: 13, fontWeight: 600 }}>
+            ⚡ {conflicts.length} return decision conflict(s) require Executive Tie-Breaker Override!
+          </span>
+          <button className="btn btn-danger btn-sm" onClick={() => setActiveTab('conflicts')}>
+            Resolve Override →
+          </button>
+        </div>
+      )}
 
       {/* Pending Approvals Banner */}
       {pending.length > 0 && (
@@ -165,8 +186,8 @@ export default function ManagerView({ token }) {
           <div className="stat-value amount-positive">EGP {totalRevenue.toFixed(2)}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">In Transit</div>
-          <div className="stat-value" style={{ color: 'var(--clr-purple)' }}>{counts.in_transit || 0}</div>
+          <div className="stat-label">Return Conflicts</div>
+          <div className="stat-value" style={{ color: conflicts.length > 0 ? 'var(--clr-danger)' : 'var(--clr-text-muted)' }}>{conflicts.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Pending Approvals</div>
@@ -180,6 +201,9 @@ export default function ManagerView({ token }) {
       <div className="tab-row" style={{ marginBottom: 20 }}>
         <button className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>📋 Orders</button>
         <button className={`tab-btn ${activeTab === 'wallets' ? 'active' : ''}`} onClick={() => setActiveTab('wallets')}>💰 Wallets</button>
+        <button className={`tab-btn ${activeTab === 'conflicts' ? 'active' : ''}`} onClick={() => setActiveTab('conflicts')}>
+          ⚡ Return Conflicts {conflicts.length > 0 && <span style={{ background: 'var(--clr-danger)', color: 'white', borderRadius: 999, padding: '0 6px', fontSize: 10, marginLeft: 4 }}>{conflicts.length}</span>}
+        </button>
         <button className={`tab-btn ${activeTab === 'approvals' ? 'active' : ''}`} onClick={() => setActiveTab('approvals')}>
           👥 Approvals {pending.length > 0 && <span style={{ background: 'var(--clr-warning)', color: 'white', borderRadius: 999, padding: '0 6px', fontSize: 10, marginLeft: 4 }}>{pending.length}</span>}
         </button>
@@ -256,6 +280,93 @@ export default function ManagerView({ token }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Return Conflicts Tab (Manager Override Tie-Breaker) */}
+      {activeTab === 'conflicts' && (
+        <div className="card">
+          <div className="card-header" style={{ marginBottom: 16 }}>
+            <span className="card-title" style={{ color: 'var(--clr-danger)' }}>⚡ Return Decision Conflicts & Override Queue</span>
+            <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>
+              As Executive Manager, your vote acts as the binding tie-breaker when Inventory and Supervisor disagree or stall.
+            </span>
+          </div>
+
+          {conflicts.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">✅</div>
+              <p>No active decision conflicts or pending tie-breaker overrides.</p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tracking</th>
+                    <th>Return Reason</th>
+                    <th>Inventory Vote</th>
+                    <th>Supervisor Vote</th>
+                    <th>Driver Reassign Select</th>
+                    <th>Executive Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {conflicts.map(r => (
+                    <tr key={r.id}>
+                      <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>#{r.tracking_number}</td>
+                      <td style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>{r.reason}</td>
+                      <td>
+                        {r.inventory_vote ? (
+                          <span className={`badge ${r.inventory_vote === 'kill' ? 'badge-cancelled' : 'badge-assigned'}`}>
+                            {r.inventory_vote.toUpperCase()}
+                          </span>
+                        ) : <span style={{ color: 'var(--clr-text-dim)' }}>Pending</span>}
+                      </td>
+                      <td>
+                        {r.supervisor_vote ? (
+                          <span className={`badge ${r.supervisor_vote === 'kill' ? 'badge-cancelled' : 'badge-assigned'}`}>
+                            {r.supervisor_vote.toUpperCase()}
+                          </span>
+                        ) : <span style={{ color: 'var(--clr-text-dim)' }}>Pending</span>}
+                      </td>
+                      <td>
+                        <select
+                          className="form-input"
+                          style={{ fontSize: 12, padding: '4px 8px' }}
+                          value={reassignDriverMap[r.id] || ''}
+                          onChange={(e) => setReassignDriverMap(m => ({ ...m, [r.id]: e.target.value }))}
+                        >
+                          <option value="">-- Choose Driver --</option>
+                          {drivers.map(d => (
+                            <option key={d.id} value={d.id}>{d.name} (@{d.username})</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            disabled={submitting[r.id] === 'kill'}
+                            onClick={() => handleManagerOverride(r.id, 'kill')}
+                          >
+                            {submitting[r.id] === 'kill' ? <span className="spinner" /> : '⚡ Force Kill'}
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={submitting[r.id] === 'reassign'}
+                            onClick={() => handleManagerOverride(r.id, 'reassign')}
+                          >
+                            {submitting[r.id] === 'reassign' ? <span className="spinner" /> : '🔄 Force Reassign'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
