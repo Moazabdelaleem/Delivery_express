@@ -123,8 +123,7 @@ exports.createReturn = async (req, res) => {
     if (!order_id) return res.status(400).json({ error: 'Order ID is required.' });
     if (!return_type || !['full', 'partial'].includes(return_type))
       return res.status(400).json({ error: "Return type must be 'full' or 'partial'." });
-    if (!reason || !reason.trim())
-      return res.status(400).json({ error: 'Reason is required for initiating a return.' });
+    const cleanReason = (reason && reason.trim()) || `${return_type === 'full' ? 'Full' : 'Partial'} return initiated`;
 
     const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [order_id]);
     if (orderRes.rows.length === 0) return res.status(404).json({ error: 'Order not found.' });
@@ -138,7 +137,7 @@ exports.createReturn = async (req, res) => {
     const insertRes = await db.query(
       `INSERT INTO returns (order_id, initiated_by, return_type, reason, status, returned_items_amount, returned_quantity)
        VALUES ($1,$2,$3,$4,'pending_pickup',$5,$6) RETURNING *`,
-      [order_id, req.user.id, return_type, reason.trim(), retAmt,
+      [order_id, req.user.id, return_type, cleanReason, retAmt,
        parseInt(returned_quantity) || parseInt(order.returned_quantity || 0)]
     );
 

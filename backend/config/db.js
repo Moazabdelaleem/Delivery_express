@@ -58,6 +58,8 @@ const initSchema = async () => {
 
   // Drop old status constraint to support new return lifecycle statuses (in_transit_back, awaiting_second_vote, vote_conflict, cancelled)
   await safeQuery('ALTER TABLE returns DROP CONSTRAINT IF EXISTS returns_status_check;');
+  await safeQuery('ALTER TABLE returns ALTER COLUMN reason DROP NOT NULL;');
+  await safeQuery("ALTER TABLE returns ALTER COLUMN reason SET DEFAULT 'Return initiated';");
 
   // Edge cases & liability settlement columns
   await safeQuery('ALTER TABLE returns ADD COLUMN IF NOT EXISTS damaged_missing_qty INT DEFAULT 0;');
