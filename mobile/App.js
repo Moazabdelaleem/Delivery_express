@@ -4412,6 +4412,7 @@ const parseSafeJson = async (res) => {
 
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* DELIVERY FAILURE MODAL */}

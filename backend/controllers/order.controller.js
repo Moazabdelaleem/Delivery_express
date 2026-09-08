@@ -605,7 +605,11 @@ exports.updateDeliveryStatus = async (req, res) => {
       );
       if (existingReturn.rows.length === 0) {
         const rType = deliveryOutcome === 'partial' ? 'partial' : 'full';
-        const rReason = return_notes || failure_reason || (outcomeObj ? outcomeObj.label_ar : `Automatic return created from ${deliveryOutcome} outcome`);
+        const rReason = (return_notes && return_notes.trim()) ||
+                        (failure_reason && failure_reason.trim()) ||
+                        (outcomeObj && outcomeObj.label_ar) ||
+                        (outcomeObj && outcomeObj.label_en) ||
+                        `Automatic return record for ${deliveryOutcome || 'delivery'} outcome`;
         await client.query(
           `INSERT INTO returns (order_id, initiated_by, return_type, reason, status, returned_items_amount, returned_quantity)
            VALUES ($1, $2, $3, $4, 'pending_verification', $5, $6)`,
