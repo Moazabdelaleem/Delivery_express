@@ -2692,13 +2692,6 @@ const parseSafeJson = async (res) => {
                         : (lang === 'ar' ? 'جاهز للتوصيل — لا توجد شحنات نشطة' : 'Ready — No Active Deliveries'))
                       : t('youAreOffline')}
                   </Text>
-                  {driverOnline ? (
-                    <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, marginTop: 4 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>
-                        ⏱️ {lang === 'ar' ? `اليوم: ${workedHoursToday} س | الشهر: ${workedHoursMonth} س` : `Today: ${workedHoursToday} hrs | Month: ${workedHoursMonth} hrs`}
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
               </View>
               <TouchableOpacity
@@ -3225,9 +3218,6 @@ const parseSafeJson = async (res) => {
                 {safeDeliveryGuys.length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : safeDeliveryGuys.map((g) => {
-                  const sh = shiftSummaries.find(s => String(s.driver_id) === String(g.id || g.delivery_guy_id));
-                  const dailyH = sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00';
-                  const monthlyH = sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00';
                   return (
                     <TouchableOpacity
                       key={g.id || g.delivery_guy_id}
@@ -3243,26 +3233,6 @@ const parseSafeJson = async (res) => {
                         <Text style={[styles.statusTag, { backgroundColor: g.online_status === 'online' ? '#10b981' : '#6b7280' }]}>
                           {g.online_status === 'online' ? t('youAreOnline') : t('youAreOffline')}
                         </Text>
-                      </View>
-
-                      {/* Working Hours Telemetry (Daily Reset & Monthly Accumulation) */}
-                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12, marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: isDarkMode ? '#334155' : '#e2e8f0' }}>
-                        <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flex: 1 }}>
-                          <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: '700' }}>
-                            {lang === 'ar' ? '⏱️ اليوم (إعادة تصفير يومية)' : '⏱️ Worked Today (Daily)'}
-                          </Text>
-                          <Text style={{ fontSize: 13, color: '#2563eb', fontWeight: '900', marginTop: 2 }}>
-                            {dailyH} {lang === 'ar' ? 'ساعة' : 'hrs'}
-                          </Text>
-                        </View>
-                        <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, flex: 1 }}>
-                          <Text style={{ fontSize: 10, color: isDarkMode ? '#94a3b8' : '#64748b', fontWeight: '700' }}>
-                            {lang === 'ar' ? '📅 الشهر (تراكمي شهري)' : '📅 Worked Month (Accumulated)'}
-                          </Text>
-                          <Text style={{ fontSize: 13, color: '#7c3aed', fontWeight: '900', marginTop: 2 }}>
-                            {monthlyH} {lang === 'ar' ? 'ساعة' : 'hrs'}
-                          </Text>
-                        </View>
                       </View>
 
                       <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 8 }, isRTL && styles.rtlText]}>

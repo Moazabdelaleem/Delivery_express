@@ -254,13 +254,10 @@ export default function ManagerView({ token }) {
                   <th>Collection Cash</th>
                   <th>Pocket Balance</th>
                   <th>Total Spent</th>
-                  <th>⏱️ Worked Today (Daily)</th>
-                  <th>📅 Worked Month (Accumulated)</th>
                 </tr>
               </thead>
               <tbody>
                 {wallets.map(w => {
-                  const sh = shiftSummaries.find(s => String(s.driver_id) === String(w.id || w.delivery_guy_id));
                   return (
                     <tr key={w.id}>
                       <td style={{ fontWeight: 600 }}>{w.name}</td>
@@ -268,12 +265,6 @@ export default function ManagerView({ token }) {
                       <td className="amount amount-positive">EGP {parseFloat(w.collection_balance || 0).toFixed(2)}</td>
                       <td className="amount" onClick={() => handleOpenLedger(w)} style={{ cursor: 'pointer', textDecoration: 'underline' }} title="Click to view ledger history">EGP {parseFloat(w.pocket_balance || 0).toFixed(2)}</td>
                       <td style={{ color: 'var(--clr-warning)' }}>EGP {parseFloat(w.total_spent || 0).toFixed(2)}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>
-                        ⏱️ {sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00'} hrs
-                      </td>
-                      <td style={{ fontWeight: 700, color: 'var(--clr-purple)' }}>
-                        📅 {sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00'} hrs
-                      </td>
                     </tr>
                   );
                 })}

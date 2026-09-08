@@ -41,6 +41,7 @@ export default function FinanceView({ token }) {
       setOrders(Array.isArray(ord) ? ord : []);
     } catch (err) {
       toast.error('Failed to load: ' + err.message);
+    }
   }, [token]);
 
   useWindowFocus(fetchData);

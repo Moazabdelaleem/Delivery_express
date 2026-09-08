@@ -477,6 +477,10 @@ export default function InventoryView({ token }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
       {/* Receive Items Modal */}
       {receiveModal && (
         <div className="modal-overlay">

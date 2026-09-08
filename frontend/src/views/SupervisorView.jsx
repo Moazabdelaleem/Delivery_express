@@ -543,13 +543,10 @@ export default function SupervisorView({ token, user }) {
                       <th>Driver Name</th>
                       <th>Username</th>
                       <th>Status</th>
-                      <th>⏱️ Worked Today (Daily)</th>
-                      <th>📅 Worked This Month (Accumulated)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {drivers.map(d => {
-                      const sh = shiftSummaries.find(s => String(s.driver_id) === String(d.id));
                       return (
                         <tr key={d.id}>
                           <td><strong>{d.name}</strong></td>
@@ -558,12 +555,6 @@ export default function SupervisorView({ token, user }) {
                             <span className={`badge ${d.online_status === 'online' ? 'badge-delivered' : 'badge-ghost'}`}>
                               {d.online_status === 'online' ? '🟢 Online' : '⚫ Offline'}
                             </span>
-                          </td>
-                          <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>
-                            ⏱️ {sh ? (sh.daily_hours || sh.total_hours_today || '0.00') : '0.00'} hrs
-                          </td>
-                          <td style={{ fontWeight: 700, color: 'var(--clr-purple)' }}>
-                            📅 {sh ? (sh.monthly_hours || sh.total_hours_month || '0.00') : '0.00'} hrs
                           </td>
                         </tr>
                       );
