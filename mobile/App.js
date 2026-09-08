@@ -2626,7 +2626,7 @@ const parseSafeJson = async (res) => {
                   </View>
                 </View>
               );
-            })}
+            }))}
         </View>
 
         {/* SUB-SECTION 4: 📜 CLOSED HISTORY */}
