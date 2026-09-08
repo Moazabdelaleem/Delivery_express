@@ -338,6 +338,19 @@ const translations = {
     rejectedMsg: "Pending account rejected & removed.",
     wipeFailMsg: "Clean wipe failed. Check your connection.",
 
+    loadingDefault: "⚡ Syncing action with server...",
+    loadingSubtext: "Please wait, communicating with server and updating records...",
+    loadingAuth: "🔑 Authenticating credentials...",
+    loadingDispatch: "📦 Creating & dispatching new order to driver...",
+    loadingReceive: "📦 Receiving items physically at warehouse bay...",
+    loadingVote: "🗳️ Registering verification vote...",
+    loadingOverride: "⚡ Applying Executive Manager decision...",
+    loadingStatus: "🔄 Updating order delivery status...",
+    loadingHandoff: "🏭 Confirming warehouse package handoff...",
+    loadingPullout: "💵 Processing collection cash settlement...",
+    loadingTopup: "💳 Processing pocket allowance top-up...",
+    loadingExpense: "🧾 Submitting fuel/pocket expense claim...",
+
     languageName: "العربية"
   },
   ar: {
@@ -528,6 +541,19 @@ const translations = {
     approvedMsg: "تمت الموافقة على الحساب بنجاح!",
     rejectedMsg: "تم رفض الطلب وإزالته.",
     wipeFailMsg: "فشل مسح البيانات. تحقق من الاتصال.",
+
+    loadingDefault: "⚡ جاري مزامنة الإجراء وإرسال البيانات للسيرفر...",
+    loadingSubtext: "يرجى الانتظار، يتم الاتصال بالخادم وتحديث السجلات بالأقسام...",
+    loadingAuth: "🔑 جاري التحقق من بيانات تسجيل الدخول...",
+    loadingDispatch: "📦 جاري إنشاء الشحنة وإسنادها للمندوب...",
+    loadingReceive: "📦 جاري إثبات استلام الشحنة وتفتيشها بالمخزن...",
+    loadingVote: "🗳️ جاري تسجيل تصويتك على المرتجع...",
+    loadingOverride: "⚡ جاري تطبيق قرار المدير التنفيذي وكسر التعادل...",
+    loadingStatus: "🔄 جاري تحديث حالة التوصيل للطلب...",
+    loadingHandoff: "🏭 جاري تأكيد تسليم الطرد للمندوب بالمخزن...",
+    loadingPullout: "💵 جاري توريد وتسوية نقدية محفظة التحصيل...",
+    loadingTopup: "💳 جاري شحن عهدة المصاريف للمندوب...",
+    loadingExpense: "🧾 جاري تسجيل مصروف العهدة بالسيرفر...",
 
     languageName: "English"
   }
@@ -1593,6 +1619,12 @@ const parseSafeJson = async (res) => {
   };
 
   const updateDeliveryStatus = async (orderId, newStatus, cash = 0, reasonNote = '', outcomePayload = {}) => {
+    const targetOrd = safeOrders.find(o => o.id === orderId);
+    const trackingCode = targetOrd ? (targetOrd.tracking_number || '') : '';
+    startBuffer(lang === 'ar'
+      ? `🔄 [حالة التوصيل] جاري تحديث حالة الشحنة #${trackingCode} إلى (${tStatus(newStatus)})...`
+      : `🔄 [Delivery Status] Updating order #${trackingCode} status to (${tStatus(newStatus)})...`
+    );
     setActionLoadingId(`status_${orderId}`);
     try {
       const res = await fetch(`${apiBase}/orders/${orderId}/delivery-status`, {
@@ -1610,7 +1642,13 @@ const parseSafeJson = async (res) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`${t('statusUpdated')}`);
+        showToast(
+          lang === 'ar'
+            ? `✅ [تحديث التوصيل] تم تحديث حالة الشحنة #${trackingCode} بنجاح إلى: ${tStatus(newStatus)}`
+            : `✅ [Delivery Update] Order #${trackingCode} status updated to: ${tStatus(newStatus)}`,
+          'success',
+          lang === 'ar' ? 'تحديث حالة الشحنة ✅' : 'Status Updated ✅'
+        );
         fetchData();
       } else {
         Alert.alert(t('alertError'), data.error || 'Status update failed');
@@ -1618,6 +1656,7 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
@@ -2026,6 +2065,11 @@ const parseSafeJson = async (res) => {
       return;
     }
 
+    const trackingCode = orderNumber.trim() || editingOrderId || '';
+    startBuffer(lang === 'ar'
+      ? `📦 [إسناد الشحنة] جاري ${editingOrderId ? 'تعديل' : 'إنشاء وإسناد'} الشحنة #${trackingCode}...`
+      : `📦 [Order Dispatch] ${editingOrderId ? 'Updating' : 'Creating & dispatching'} order #${trackingCode}...`
+    );
     setActionLoadingId('createOrder');
     try {
       const isEditing = Boolean(editingOrderId);
@@ -2050,9 +2094,12 @@ const parseSafeJson = async (res) => {
       });
 
       if (res.ok) {
-        showToast(isEditing
-          ? (lang === 'ar' ? 'تم تحديث بيانات الشحنة بنجاح!' : 'Order updated successfully!')
-          : `${t('orderCreatedMsg')}`
+        showToast(
+          isEditing
+            ? (lang === 'ar' ? `📦 [تعديل الشحنة] تم تحديث بيانات الشحنة #${trackingCode} بنجاح!` : `📦 [Edit Order] Order #${trackingCode} updated successfully!`)
+            : (lang === 'ar' ? `🚚 [إسناد الشحنة] تم إنشاء الشحنة #${trackingCode} وإسنادها للمندوب بنجاح!` : `🚚 [Order Dispatch] Order #${trackingCode} created & assigned successfully!`),
+          'success',
+          lang === 'ar' ? 'تم الإسناد بنجاح 🚚' : 'Order Dispatched 🚚'
         );
         setCreateOrderModal(false);
         setEditingOrderId(null);
@@ -2075,6 +2122,7 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
@@ -2130,6 +2178,11 @@ const parseSafeJson = async (res) => {
 
   const handleConfirmReceiveItems = async () => {
     if (!selectedReturnForReceive) return;
+    const trackingCode = selectedReturnForReceive.tracking_number || selectedReturnForReceive.order_id || '';
+    startBuffer(lang === 'ar'
+      ? `📦 [المخزن] جاري إثبات استلام وتفتيش الطرد المرتجع #${trackingCode}...`
+      : `📦 [Warehouse] Logging physical receipt & inspection for package #${trackingCode}...`
+    );
     setActionLoadingId(`receive_${selectedReturnForReceive.id}`);
     try {
       const res = await fetch(`${apiBase}/returns/${selectedReturnForReceive.id}/receive`, {
@@ -2145,7 +2198,13 @@ const parseSafeJson = async (res) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(lang === 'ar' ? '✅ تم تأكيد استلام المنتجات المرتجعة بالمخزن!' : '✅ Received items logged physically into warehouse queue!');
+        showToast(
+          lang === 'ar'
+            ? `📦 [المخزن] تم استلام وتفتيش الطرد المرتجع #${trackingCode} بنجاح! القطع التالفة: ${receiveDmgQty}`
+            : `📦 [Warehouse] Package #${trackingCode} received & inspected! Damaged items: ${receiveDmgQty}`,
+          'success',
+          lang === 'ar' ? 'تأكيد استلام بالمخزن 📦' : 'Warehouse Receipt Logged 📦'
+        );
         setReceiveModal(false);
         setSelectedReturnForReceive(null);
         setReceiveDmgQty('0');
@@ -2157,6 +2216,7 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
@@ -2167,6 +2227,16 @@ const parseSafeJson = async (res) => {
       Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى اختيار مندوب لإعادة الإسناد' : 'Please select a driver for re-assignment');
       return;
     }
+    const targetRet = returnsList.find(r => r.id === returnId);
+    const trackingCode = targetRet ? (targetRet.tracking_number || targetRet.order_id || '') : '';
+    const actionLabel = voteAction === 'kill'
+      ? (lang === 'ar' ? 'إلغاء وإرجاع للتاجر' : 'Kill Order')
+      : (lang === 'ar' ? 'إعادة إسناد' : 'Reassign Order');
+
+    startBuffer(lang === 'ar'
+      ? `🗳️ [التصويت] جاري تسجيل تصويتك (${actionLabel}) للشحنة #${trackingCode}...`
+      : `🗳️ [Voting] Registering your vote (${actionLabel}) for package #${trackingCode}...`
+    );
     setActionLoadingId(`vote_${returnId}`);
     try {
       const res = await fetch(`${apiBase}/returns/${returnId}/vote`, {
@@ -2182,7 +2252,13 @@ const parseSafeJson = async (res) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(lang === 'ar' ? '✅ تم تسجيل تصويتك على حالة المرتجع بنجاح!' : '✅ Vote recorded successfully!');
+        showToast(
+          lang === 'ar'
+            ? `🗳️ [التصويت] تم تسجيل تصويتك (${actionLabel}) للشحنة #${trackingCode} بنجاح!`
+            : `🗳️ [Voting] Registered vote (${actionLabel}) for package #${trackingCode}!`,
+          'success',
+          lang === 'ar' ? 'تسجيل الصوت 🗳️' : 'Vote Registered 🗳️'
+        );
         fetchData();
       } else {
         Alert.alert(t('alertError'), data.error || 'Vote failed');
@@ -2190,11 +2266,18 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
 
   const handleForceTransitReturn = async (returnId) => {
+    const targetRet = returnsList.find(r => r.id === returnId);
+    const trackingCode = targetRet ? (targetRet.tracking_number || targetRet.order_id || '') : '';
+    startBuffer(lang === 'ar'
+      ? `🚚 [شحن المرتجع] جاري بدء شحن المرتجع للشحنة #${trackingCode} للمخزن...`
+      : `🚚 [Return Transit] Advancing package #${trackingCode} in transit to warehouse...`
+    );
     setActionLoadingId(`transit_${returnId}`);
     try {
       const res = await fetch(`${apiBase}/returns/${returnId}/force-transit`, {
@@ -2203,7 +2286,13 @@ const parseSafeJson = async (res) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(lang === 'ar' ? '🚚 تم بدء شحن المرتجع للمخزن' : '🚚 Forced return in transit to warehouse');
+        showToast(
+          lang === 'ar'
+            ? `🚚 [شحن المرتجع] تم إشعارات المخزن وبدء شحن الشحنة المرتجعة #${trackingCode}!`
+            : `🚚 [Return Transit] Package #${trackingCode} is now in transit back to warehouse!`,
+          'success',
+          lang === 'ar' ? 'بدء شحن المرتجع 🚚' : 'Return Transit Started 🚚'
+        );
         fetchData();
       } else {
         Alert.alert(t('alertError'), data.error || 'Failed to force transit');
@@ -2211,6 +2300,7 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
@@ -2221,6 +2311,16 @@ const parseSafeJson = async (res) => {
       Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى اختيار مندوب لإعادة الإسناد' : 'Please select a driver for re-assignment');
       return;
     }
+    const targetRet = returnsList.find(r => r.id === returnId);
+    const trackingCode = targetRet ? (targetRet.tracking_number || targetRet.order_id || '') : '';
+    const decisionLabel = decision === 'kill'
+      ? (lang === 'ar' ? 'إلغاء نهائي وإرجاع للتاجر' : 'Kill Order')
+      : (lang === 'ar' ? 'إعادة إسناد لمندوب جديد' : 'Reassign Order');
+
+    startBuffer(lang === 'ar'
+      ? `⚡ [قرار المدير] جاري تنفيذ قرار المدير التنفيذي (${decisionLabel}) للشحنة #${trackingCode}...`
+      : `⚡ [Executive Override] Executing Manager decision (${decisionLabel}) for package #${trackingCode}...`
+    );
     setActionLoadingId(`override_${returnId}`);
     try {
       const res = await fetch(`${apiBase}/returns/${returnId}/manager-override`, {
@@ -2236,7 +2336,13 @@ const parseSafeJson = async (res) => {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(lang === 'ar' ? '⚡ تم تطبيق قرار المدير وكسر التعادل بنجاح!' : '⚡ Manager override decision applied!');
+        showToast(
+          lang === 'ar'
+            ? `⚡ [قرار المدير] تم تطبيق قرار المدير التنفيذي (${decisionLabel}) للشحنة #${trackingCode} وكسر التعادل بنجاح!`
+            : `⚡ [Executive Override] Applied Manager decision (${decisionLabel}) for package #${trackingCode}!`,
+          'success',
+          lang === 'ar' ? 'تطبيق قرار المدير ⚡' : 'Manager Override Applied ⚡'
+        );
         fetchData();
       } else {
         Alert.alert(t('alertError'), data.error || 'Override failed');
@@ -2244,6 +2350,7 @@ const parseSafeJson = async (res) => {
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
     } finally {
+      stopBuffer();
       setActionLoadingId(null);
     }
   };
@@ -6686,10 +6793,10 @@ const parseSafeJson = async (res) => {
               <ActivityIndicator size="large" color="#3b82f6" />
             </View>
             <Text style={[styles.bufferTitleMobile, isRTL && styles.rtlText]}>
-              {bufferLoadingMsg || (lang === 'ar' ? 'جاري تنفيذ الإجراء وإرسال البيانات...' : 'Processing action & sync...')}
+              {bufferLoadingMsg || t('loadingDefault')}
             </Text>
             <Text style={[styles.bufferSubMobile, isRTL && styles.rtlText]}>
-              {lang === 'ar' ? 'يرجى الانتظار لحظات...' : 'Please wait a moment...'}
+              {t('loadingSubtext')}
             </Text>
           </View>
         </View>
