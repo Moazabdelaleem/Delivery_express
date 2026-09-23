@@ -660,3 +660,209 @@ exports.getDriverReturnPickups = async (req, res) => {
     res.status(500).json({ error: err.message || 'Server error fetching driver return pickups.' });
   }
 };
+
+// ─── Inventory Resolution: Deliver Later vs Not Delivered (with compulsory photo proof) ─────
+
+exports.resolveConflict = async (req, res) => {
+  try {
+    const { return_id } = req.params;
+    const { resolution, return_photo, proof_attachment_id, condition_notes, damaged_missing_qty } = req.body || {};
+
+    if (!['deliver_later', 'not_delivered'].includes(resolution)) {
+      return res.status(400).json({ error: "Resolution must be 'deliver_later' or 'not_delivered'." });
+    }
+
+    const returnRes = await db.query(
+      `SELECT r.*, o.tracking_number, o.supervisor_id, o.delivery_guy_id
+       FROM returns r JOIN orders o ON r.order_id = o.id
+       WHERE r.id = $1`,
+      [return_id]
+    );
+    if (returnRes.rows.length === 0) return res.status(404).json({ error: 'Return not found.' });
+    const ret = returnRes.rows[0];
+
+    // Ensure table has resolution column
+    await db.query(`ALTER TABLE returns ADD COLUMN IF NOT EXISTS resolution VARCHAR(30);`).catch(() => {});
+
+    // Require Photo Proof
+    let attachmentId = proof_attachment_id;
+    if (return_photo) {
+      const { uploadToStorage } = require('../config/storage');
+      const storageUrl = await uploadToStorage(return_photo, 'return_verification');
+      const attRes = await db.query(
+        `INSERT INTO order_attachments (order_id, stage, uploaded_by, is_required, storage_url)
+         VALUES ($1, 'return_verification', $2, true, $3)
+         RETURNING id`,
+        [ret.order_id, req.user.id, storageUrl]
+      );
+      attachmentId = attRes.rows[0].id;
+    }
+
+    if (!attachmentId) {
+      const existingAtt = await db.query(
+        `SELECT id FROM order_attachments WHERE order_id = $1 AND stage = 'return_verification' LIMIT 1`,
+        [ret.order_id]
+      );
+      if (existingAtt.rows.length === 0) {
+        return res.status(400).json({ error: 'Photo of the returned package is required to complete return resolution.' });
+      }
+      attachmentId = existingAtt.rows[0].id;
+    }
+
+    const dmgQty = parseInt(damaged_missing_qty) || 0;
+    const notes = condition_notes ? condition_notes.trim() : null;
+    const io = req.app.get('io');
+
+    if (resolution === 'not_delivered') {
+      // Order is dead/cancelled here
+      await db.query(
+        `UPDATE returns
+         SET status = 'verified',
+             resolution = 'not_delivered',
+             damaged_missing_qty = $1,
+             condition_notes = $2,
+             verified_by = $3,
+             verified_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $4`,
+        [dmgQty, notes, req.user.id, return_id]
+      );
+      await db.query(
+        `UPDATE orders SET items_resolution = 'cancelled', status = 'delivery_failed', updated_at = NOW() WHERE id = $1`,
+        [ret.order_id]
+      );
+      await db.query(
+        `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+         VALUES ($1, 'in_transit', 'delivery_failed', $2, 'Order not delivered (Dead). Package returned to warehouse with photo proof.')`,
+        [ret.order_id, req.user.id]
+      );
+
+      if (io) {
+        io.to('role_supervisor').to('role_inventory').to('role_manager').to('role_finance')
+          .emit('return_updated', { return_id, order_id: ret.order_id, status: 'verified', resolution: 'not_delivered' });
+      }
+
+      sendPushToRole('supervisor',
+        '📦 Return Finalized (Not Delivered)',
+        `Package #${ret.tracking_number} returned to warehouse with photo proof. Order marked dead/cancelled.`,
+        { order_id: ret.order_id, return_id }
+      );
+
+      return res.json({
+        message: 'Order marked as NOT DELIVERED. Package received in warehouse with photo proof and finalized.',
+        resolution: 'not_delivered',
+        status: 'verified'
+      });
+    } else {
+      // deliver_later -> Appears on Supervisor's screen for action
+      await db.query(
+        `UPDATE returns
+         SET status = 'awaiting_supervisor_action',
+             resolution = 'deliver_later',
+             damaged_missing_qty = $1,
+             condition_notes = $2,
+             verified_by = $3,
+             verified_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $4`,
+        [dmgQty, notes, req.user.id, return_id]
+      );
+      await db.query(
+        `UPDATE orders SET items_resolution = 'deliver_later', updated_at = NOW() WHERE id = $1`,
+        [ret.order_id]
+      );
+
+      if (io) {
+        io.to('role_supervisor').to('role_manager')
+          .emit('return_updated', { return_id, order_id: ret.order_id, status: 'awaiting_supervisor_action', resolution: 'deliver_later' });
+      }
+
+      sendPushToRole('supervisor',
+        '🚚 Deliver Later — Action Required',
+        `Package #${ret.tracking_number} received in warehouse with photo proof. Mark as Reassign or Keep as is.`,
+        { order_id: ret.order_id, return_id }
+      );
+
+      return res.json({
+        message: 'Order marked for DELIVER LATER with photo proof. Sent to Supervisor to reassign or keep as is.',
+        resolution: 'deliver_later',
+        status: 'awaiting_supervisor_action'
+      });
+    }
+  } catch (err) {
+    console.error('Error in resolveConflict:', err);
+    res.status(500).json({ error: err.message || 'Server error resolving return conflict.' });
+  }
+};
+
+// ─── Supervisor Action for Deliver Later (Reassign vs Keep as is) ────────────
+
+exports.supervisorAction = async (req, res) => {
+  try {
+    const { return_id } = req.params;
+    const { action, reassign_driver_id } = req.body || {};
+
+    if (!['reassign', 'keep_as_is'].includes(action)) {
+      return res.status(400).json({ error: "Action must be 'reassign' or 'keep_as_is'." });
+    }
+
+    const returnRes = await db.query(
+      `SELECT r.*, o.tracking_number, o.delivery_guy_id, o.supervisor_id
+       FROM returns r JOIN orders o ON r.order_id = o.id
+       WHERE r.id = $1`,
+      [return_id]
+    );
+    if (returnRes.rows.length === 0) return res.status(404).json({ error: 'Return not found.' });
+
+    const ret = returnRes.rows[0];
+    const io = req.app.get('io');
+
+    if (action === 'reassign') {
+      const targetDriverId = reassign_driver_id || ret.reassign_driver_id || ret.delivery_guy_id;
+      await db.query(
+        `UPDATE orders SET delivery_guy_id = $1, status = 'assigned', items_resolution = 'reassigned', updated_at = NOW() WHERE id = $2`,
+        [targetDriverId, ret.order_id]
+      );
+      await db.query(
+        `UPDATE returns SET status = 'reassigned', reassign_driver_id = $1, updated_at = NOW() WHERE id = $2`,
+        [targetDriverId, return_id]
+      );
+
+      if (io) {
+        io.to('role_supervisor').to('role_inventory').to('role_manager')
+          .emit('return_updated', { return_id, order_id: ret.order_id, status: 'reassigned', driver_id: targetDriverId });
+        io.to(`user_${targetDriverId}`).emit('order_assigned', { order_id: ret.order_id, tracking_number: ret.tracking_number });
+      }
+
+      sendPushNotification(
+        targetDriverId,
+        '📦 Order Reassigned',
+        `Order #${ret.tracking_number} has been reassigned to you for delivery.`,
+        { order_id: ret.order_id }
+      );
+
+      return res.json({ message: 'Order successfully reassigned to driver.', action: 'reassign', driver_id: targetDriverId });
+    } else {
+      // keep_as_is
+      await db.query(
+        `UPDATE returns SET status = 'kept_as_is', updated_at = NOW() WHERE id = $1`,
+        [return_id]
+      );
+      await db.query(
+        `UPDATE orders SET items_resolution = 'kept_as_is', updated_at = NOW() WHERE id = $1`,
+        [ret.order_id]
+      );
+
+      if (io) {
+        io.to('role_supervisor').to('role_inventory').to('role_manager')
+          .emit('return_updated', { return_id, order_id: ret.order_id, status: 'kept_as_is' });
+      }
+
+      return res.json({ message: 'Order kept as is for future redelivery.', action: 'keep_as_is' });
+    }
+  } catch (err) {
+    console.error('Error in supervisorAction:', err);
+    res.status(500).json({ error: err.message || 'Server error performing supervisor action.' });
+  }
+};
+

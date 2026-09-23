@@ -174,6 +174,8 @@ exports.getShiftSummary = async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     // Map drivers
+    const todayDateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     const driverSummaries = {};
     driverRes.rows.forEach(d => {
       driverSummaries[d.id] = {
@@ -188,7 +190,8 @@ exports.getShiftSummary = async (req, res) => {
         has_active_shift: false,
         active_shift_seconds: 0,
         today_shifts: [],
-        month_shifts_count: 0
+        month_shifts_count: 0,
+        daily_map: {}
       };
     });
 
@@ -196,9 +199,27 @@ exports.getShiftSummary = async (req, res) => {
       const dId = shift.delivery_guy_id;
       if (!driverSummaries[dId]) return;
 
-      const clockInTime = new Date(shift.clock_in_at).getTime();
+      const clockInObj = new Date(shift.clock_in_at);
+      const clockInTime = clockInObj.getTime();
       const clockOutTime = shift.clock_out_at ? new Date(shift.clock_out_at).getTime() : Date.now();
       const durationSeconds = Math.max(0, Math.floor((clockOutTime - clockInTime) / 1000));
+
+      const dateKey = `${clockInObj.getFullYear()}-${String(clockInObj.getMonth() + 1).padStart(2, '0')}-${String(clockInObj.getDate()).padStart(2, '0')}`;
+
+      if (!driverSummaries[dId].daily_map[dateKey]) {
+        driverSummaries[dId].daily_map[dateKey] = {
+          date: dateKey,
+          seconds: 0,
+          shifts_count: 0,
+          has_active: false
+        };
+      }
+
+      driverSummaries[dId].daily_map[dateKey].seconds += durationSeconds;
+      driverSummaries[dId].daily_map[dateKey].shifts_count += 1;
+      if (!shift.clock_out_at) {
+        driverSummaries[dId].daily_map[dateKey].has_active = true;
+      }
 
       if (clockInTime >= startOfMonth) {
         driverSummaries[dId].monthly_seconds += durationSeconds;
@@ -228,14 +249,27 @@ exports.getShiftSummary = async (req, res) => {
       }
     });
 
-    const summaryList = Object.values(driverSummaries).map(ds => ({
-      ...ds,
-      daily_hours: (ds.daily_seconds / 3600).toFixed(2),
-      monthly_hours: (ds.monthly_seconds / 3600).toFixed(2),
-      total_hours_today: (ds.daily_seconds / 3600).toFixed(2),
-      total_hours_month: (ds.monthly_seconds / 3600).toFixed(2),
-      active_shift_hours: (ds.active_shift_seconds / 3600).toFixed(2)
-    }));
+    const summaryList = Object.values(driverSummaries).map(ds => {
+      const daily_breakdown = Object.values(ds.daily_map).map(d => ({
+        date: d.date,
+        hours: (d.seconds / 3600).toFixed(2),
+        shifts_count: d.shifts_count,
+        has_active: d.has_active,
+        is_today: d.date === todayDateKey
+      })).sort((a, b) => b.date.localeCompare(a.date));
+
+      delete ds.daily_map;
+
+      return {
+        ...ds,
+        daily_hours: (ds.daily_seconds / 3600).toFixed(2),
+        monthly_hours: (ds.monthly_seconds / 3600).toFixed(2),
+        total_hours_today: (ds.daily_seconds / 3600).toFixed(2),
+        total_hours_month: (ds.monthly_seconds / 3600).toFixed(2),
+        active_shift_hours: (ds.active_shift_seconds / 3600).toFixed(2),
+        daily_breakdown
+      };
+    });
 
     res.json({ summaries: summaryList });
   } catch (err) {

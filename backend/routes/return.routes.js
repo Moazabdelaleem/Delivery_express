@@ -19,7 +19,13 @@ router.patch('/:return_id/transit-back', authMiddleware, roleCheck(['delivery_gu
 // Inventory: physically receives items at warehouse
 router.patch('/:return_id/receive', authMiddleware, roleCheck(['inventory']), returnController.receiveItems);
 
-// Inventory + Supervisor: cast vote (kill | reassign)
+// Inventory: resolve conflict (deliver_later vs not_delivered with mandatory return photo)
+router.post('/:return_id/resolve', authMiddleware, roleCheck(['inventory', 'supervisor', 'manager']), returnController.resolveConflict);
+
+// Supervisor: supervisor action for deliver_later (reassign vs keep_as_is)
+router.post('/:return_id/supervisor-action', authMiddleware, roleCheck(['supervisor', 'manager']), returnController.supervisorAction);
+
+// Inventory + Supervisor: cast vote (legacy support)
 router.post('/:return_id/vote', authMiddleware, roleCheck(['inventory', 'supervisor']), returnController.castVote);
 
 // Legacy: verify/reject return — Inventory (kept for backward compat)

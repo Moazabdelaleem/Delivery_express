@@ -758,6 +758,7 @@ function MainApp() {
   const [workedHoursMonth, setWorkedHoursMonth] = useState('0.00');
   const [showShiftHoursModal, setShowShiftHoursModal] = useState(false);
   const [showDriverShiftDetailsInModal, setShowDriverShiftDetailsInModal] = useState(false);
+  const [showDriverDailyBreakdown, setShowDriverDailyBreakdown] = useState(false);
   const [shiftSummaries, setShiftSummaries] = useState([]);
   const [returnsList, setReturnsList] = useState([]);
   const [receiveModal, setReceiveModal] = useState(false);
@@ -2236,32 +2237,85 @@ const parseSafeJson = async (res) => {
     }
   };
 
-  const handleCastReturnVote = async (returnId, voteAction) => {
+  const handleResolveReturnConflict = async (returnId, resolution) => {
+    const targetRet = returnsList.find(r => r.id === returnId);
+    if (!targetRet) return;
+    const trackingCode = targetRet.tracking_number || targetRet.order_id || '';
+
+    // Check if return verification photo exists
+    const hasPhoto = targetRet.has_return_photo || targetRet.proof_attachment_id;
+    if (!hasPhoto) {
+      setSelectedCameraOrder({
+        id: targetRet.order_id,
+        tracking_number: targetRet.tracking_number,
+        client_address: targetRet.client_address
+      });
+      setCameraStage('return_verification');
+      setCameraModal(true);
+      Alert.alert(
+        lang === 'ar' ? 'صورة إثبات المرتجع مطلوبة' : 'Return Photo Required',
+        lang === 'ar' ? 'يرجى التقاط/إرفاق صورة إثبات المرتجع أولاً لإتمام العملية.' : 'Please take or pick a photo of the returned item first.'
+      );
+      return;
+    }
+
+    startBuffer(lang === 'ar'
+      ? `📦 [تأكيد المرتجع] جاري حفظ القرار (${resolution === 'not_delivered' ? 'لم يتم التوصيل' : 'توصيل لاحقاً'})...`
+      : `📦 [Return Decision] Saving resolution (${resolution})...`
+    );
+    setActionLoadingId(`resolve_${returnId}`);
+    try {
+      const res = await fetch(`${apiBase}/returns/${returnId}/resolve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ resolution })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(
+          lang === 'ar'
+            ? `✅ تم تسجيل القرار (${resolution === 'not_delivered' ? 'لم يتم التوصيل / ملغى' : 'توصيل لاحقاً للمشرف'}) بنجاح للشحنة #${trackingCode}`
+            : `✅ Return resolution (${resolution}) saved for order #${trackingCode}!`,
+          'success'
+        );
+        fetchData();
+      } else {
+        Alert.alert(t('alertError'), data.error || 'Resolution failed');
+      }
+    } catch (e) {
+      Alert.alert(t('alertError'), t('networkError'));
+    } finally {
+      stopBuffer();
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleSupervisorReturnAction = async (returnId, supAction) => {
     const chosenDriverId = reassignDriverIdMap[returnId];
-    if (voteAction === 'reassign' && !chosenDriverId) {
+    if (supAction === 'reassign' && !chosenDriverId) {
       Alert.alert(t('alertError'), lang === 'ar' ? 'يرجى اختيار مندوب لإعادة الإسناد' : 'Please select a driver for re-assignment');
       return;
     }
     const targetRet = returnsList.find(r => r.id === returnId);
     const trackingCode = targetRet ? (targetRet.tracking_number || targetRet.order_id || '') : '';
-    const actionLabel = voteAction === 'kill'
-      ? (lang === 'ar' ? 'إلغاء وإرجاع للتاجر' : 'Kill Order')
-      : (lang === 'ar' ? 'إعادة إسناد' : 'Reassign Order');
 
     startBuffer(lang === 'ar'
-      ? `🗳️ [التصويت] جاري تسجيل تصويتك (${actionLabel}) للشحنة #${trackingCode}...`
-      : `🗳️ [Voting] Registering your vote (${actionLabel}) for package #${trackingCode}...`
+      ? `👔 [قرار المشرف] جاري تنفيذ الإجراء (${supAction === 'reassign' ? 'إعادة إسناد' : 'الإبقاء كما هي'})...`
+      : `👔 [Supervisor Action] Executing (${supAction})...`
     );
-    setActionLoadingId(`vote_${returnId}`);
+    setActionLoadingId(`sup_${returnId}`);
     try {
-      const res = await fetch(`${apiBase}/returns/${returnId}/vote`, {
+      const res = await fetch(`${apiBase}/returns/${returnId}/supervisor-action`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          vote_action: voteAction,
+          action: supAction,
           reassign_driver_id: chosenDriverId
         })
       });
@@ -2269,14 +2323,13 @@ const parseSafeJson = async (res) => {
       if (res.ok) {
         showToast(
           lang === 'ar'
-            ? `🗳️ [التصويت] تم تسجيل تصويتك (${actionLabel}) للشحنة #${trackingCode} بنجاح!`
-            : `🗳️ [Voting] Registered vote (${actionLabel}) for package #${trackingCode}!`,
-          'success',
-          lang === 'ar' ? 'تسجيل الصوت 🗳️' : 'Vote Registered 🗳️'
+            ? `✅ تم تنفيذ قرار المشرف (${supAction === 'reassign' ? 'إعادة الإسناد للمندوب' : 'الإبقاء كما هي'}) للشحنة #${trackingCode}`
+            : `✅ Supervisor action executed for order #${trackingCode}!`,
+          'success'
         );
         fetchData();
       } else {
-        Alert.alert(t('alertError'), data.error || 'Vote failed');
+        Alert.alert(t('alertError'), data.error || 'Action failed');
       }
     } catch (e) {
       Alert.alert(t('alertError'), t('networkError'));
@@ -2621,37 +2674,42 @@ const parseSafeJson = async (res) => {
           )}
         </View>
 
-        {/* SUB-SECTION 3: 🗳️ VOTING QUEUE */}
+        {/* SUB-SECTION 3: 📦 CONFLICT RESOLUTION & SUPERVISOR BOARD */}
         <View style={{ gap: 10 }}>
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
             <Text style={{ fontSize: 15, fontWeight: '900', color: '#2563eb' }}>
-              🗳️ {lang === 'ar' ? '3. قائمة التصويت والتوجيه' : '3. Voting Queue'} ({votingQueue.length})
+              📦 {lang === 'ar' ? '3. قائمة توجيه المرتجهات والتسليم' : '3. Return Resolution & Supervisor Board'} ({votingQueue.length})
             </Text>
           </View>
 
           {votingQueue.length === 0 ? (
             <Text style={[styles.emptyText, theme.textMuted, { fontSize: 12 }]}>
-              {lang === 'ar' ? 'لا توجد مرتجعات تنتظر التصويت حالياً' : 'No return packages awaiting verification vote'}
+              {lang === 'ar' ? 'لا توجد مرتجعات تنتظر التوجيه حالياً' : 'No return packages awaiting resolution action'}
             </Text>
           ) : (
             votingQueue.map(ret => {
               const driverIdChosen = reassignDriverIdMap[ret.id];
               const isDriverPickShow = showDriverPickMap[ret.id];
+              const isAwaitingSupervisor = ret.status === 'awaiting_supervisor_action' || ret.resolution === 'deliver_later';
+
               return (
-                <View key={`vote-${ret.id}`} style={{
+                <View key={`res-${ret.id}`} style={{
                   backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff',
                   borderRadius: 16,
                   padding: 16,
                   borderWidth: 1.5,
-                  borderColor: '#3b82f6'
+                  borderColor: isAwaitingSupervisor ? '#7c3aed' : '#3b82f6'
                 }}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text style={{ fontSize: 15, fontWeight: '900', color: '#1d4ed8' }}>
                       #{ret.tracking_number || ret.order_id}
                     </Text>
-                    <View style={{ backgroundColor: '#dbeafe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
-                      <Text style={{ color: '#1e40af', fontSize: 11, fontWeight: '800' }}>
-                        🗳️ {ret.status === 'awaiting_second_vote' ? (lang === 'ar' ? 'بانتظار الصوت الثاني' : 'Awaiting 2nd Vote') : (lang === 'ar' ? 'بانتظار التأكيد' : 'Pending Verification')}
+                    <View style={{ backgroundColor: isAwaitingSupervisor ? '#f3e8ff' : '#dbeafe', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
+                      <Text style={{ color: isAwaitingSupervisor ? '#6b21a8' : '#1e40af', fontSize: 11, fontWeight: '800' }}>
+                        {isAwaitingSupervisor
+                          ? (lang === 'ar' ? '👔 بانتظار إجراء المشرف (توصيل لاحقاً)' : '👔 Awaiting Supervisor Action')
+                          : (lang === 'ar' ? '📦 بانتظار قرار المخزن والصورة' : '📦 Pending Inventory Photo & Action')
+                        }
                       </Text>
                     </View>
                   </View>
@@ -2668,84 +2726,143 @@ const parseSafeJson = async (res) => {
                     </Text>
                   ) : null}
 
-                  {/* Existing Votes Status */}
-                  <View style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff', padding: 8, borderRadius: 8, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, color: theme.text.color, fontWeight: '700' }}>
-                      👔 {lang === 'ar' ? 'المشرف: ' : 'Supervisor: '}{ret.supervisor_vote ? (ret.supervisor_vote === 'kill' ? '🔴 Kill' : '🟢 Reassign') : '⏳ Pending'}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: theme.text.color, fontWeight: '700' }}>
-                      🏭 {lang === 'ar' ? 'المخزن: ' : 'Warehouse: '}{ret.inventory_vote ? (ret.inventory_vote === 'kill' ? '🔴 Kill' : '🟢 Reassign') : '⏳ Pending'}
-                    </Text>
-                  </View>
-
-                  {/* Voting Action Buttons */}
-                  <View style={{ gap: 8 }}>
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
-                        disabled={actionLoadingId === `vote_${ret.id}`}
-                        onPress={() => handleCastReturnVote(ret.id, 'kill')}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
-                          🔴 {lang === 'ar' ? 'تصويت: إرجاع للتاجر' : 'Vote: Kill Order'}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: '#10b981', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
-                        onPress={() => {
-                          setShowDriverPickMap(prev => ({ ...prev, [ret.id]: !prev[ret.id] }));
-                        }}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 13 }}>
-                          🟢 {lang === 'ar' ? 'تصويت: إعادة إسناد' : 'Vote: Reassign'}
-                        </Text>
-                      </TouchableOpacity>
+                  {/* Photo Requirement Status Badge */}
+                  <View style={{
+                    backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                    padding: 10, borderRadius: 10, marginBottom: 12,
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                    justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="camera" size={16} color={ret.has_return_photo || ret.proof_attachment_id ? "#10b981" : "#d97706"} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: theme.text.color }}>
+                        {ret.has_return_photo || ret.proof_attachment_id
+                          ? (lang === 'ar' ? '✅ تم التقاط صورة إثبات المرتجع' : '✅ Return Photo Captured')
+                          : (lang === 'ar' ? '⚠️ صورة المرتجع مطلوبة للقرار' : '⚠️ Return Photo Required')
+                        }
+                      </Text>
                     </View>
-
-                    {(isDriverPickShow || driverIdChosen) && (
-                      <View style={{ marginTop: 6, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', padding: 10, borderRadius: 10 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: theme.text.color, marginBottom: 6 }}>
-                          {lang === 'ar' ? 'اختر مندوب التوصيل الجديد:' : 'Select New Delivery Driver:'}
-                        </Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                          {safeDeliveryGuys.map(g => {
-                            const dId = g.id || g.delivery_guy_id;
-                            const isSel = driverIdChosen === dId;
-                            return (
-                              <TouchableOpacity
-                                key={`drv-v-${dId}`}
-                                style={{
-                                  backgroundColor: isSel ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 6,
-                                  borderRadius: 8
-                                }}
-                                onPress={() => {
-                                  setReassignDriverIdMap(prev => ({ ...prev, [ret.id]: dId }));
-                                }}
-                              >
-                                <Text style={{ color: isSel ? '#fff' : theme.text.color, fontSize: 11, fontWeight: '800' }}>
-                                  {dt(g.name || g.delivery_guy_name)}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                        {driverIdChosen && (
-                          <TouchableOpacity
-                            style={{ backgroundColor: '#10b981', paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
-                            disabled={actionLoadingId === `vote_${ret.id}`}
-                            onPress={() => handleCastReturnVote(ret.id, 'reassign')}
-                          >
-                            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
-                              ✅ {lang === 'ar' ? 'تأكيد تصويت إعادة الإسناد' : 'Confirm Reassign Vote'}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
+                    <TouchableOpacity
+                      style={{ backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}
+                      onPress={() => {
+                        setSelectedCameraOrder({
+                          id: ret.order_id,
+                          tracking_number: ret.tracking_number,
+                          client_address: ret.client_address
+                        });
+                        setCameraStage('return_verification');
+                        setCameraModal(true);
+                      }}
+                    >
+                      <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '800' }}>
+                        📷 {lang === 'ar' ? 'التقاط/عرض الصورة' : 'Take/View Photo'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+
+                  {/* CASE 1: INVENTORY DECISION BUTTONS (Deliver Later vs Not Delivered) */}
+                  {!isAwaitingSupervisor && (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color, marginBottom: 2 }}>
+                        {lang === 'ar' ? 'قرار المخزن بعد استلام الطرد:' : 'Inventory Resolution Decision:'}
+                      </Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#7c3aed', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          disabled={actionLoadingId === `resolve_${ret.id}`}
+                          onPress={() => handleResolveReturnConflict(ret.id, 'deliver_later')}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                            🚚 {lang === 'ar' ? 'توصيل لاحقاً (للمشرف)' : 'Deliver Later'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#dc2626', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          disabled={actionLoadingId === `resolve_${ret.id}`}
+                          onPress={() => handleResolveReturnConflict(ret.id, 'not_delivered')}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                            📦 {lang === 'ar' ? 'لم يتم التوصيل (إلغاء وإرجاع)' : 'Not Delivered (Dead)'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* CASE 2: SUPERVISOR ACTION BUTTONS (Reassign vs Keep as is) */}
+                  {isAwaitingSupervisor && (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#6b21a8', marginBottom: 2 }}>
+                        👔 {lang === 'ar' ? 'إجراء المشرف المطلوب (توصيل لاحقاً):' : 'Supervisor Action Required (Deliver Later):'}
+                      </Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#059669', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          disabled={actionLoadingId === `sup_${ret.id}`}
+                          onPress={() => handleSupervisorReturnAction(ret.id, 'keep_as_is')}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                            📌 {lang === 'ar' ? 'الإبقاء كما هي' : 'Keep As Is'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{ flex: 1, backgroundColor: '#2563eb', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+                          onPress={() => {
+                            setShowDriverPickMap(prev => ({ ...prev, [ret.id]: !prev[ret.id] }));
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                            🔀 {lang === 'ar' ? 'إعادة إسناد لسائق' : 'Reassign Driver'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {(isDriverPickShow || driverIdChosen) && (
+                        <View style={{ marginTop: 6, backgroundColor: isDarkMode ? '#1e293b' : '#ffffff', padding: 10, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: theme.text.color, marginBottom: 6 }}>
+                            {lang === 'ar' ? 'اختر مندوب التوصيل الجديد:' : 'Select New Delivery Driver:'}
+                          </Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                            {safeDeliveryGuys.map(g => {
+                              const dId = g.id || g.delivery_guy_id;
+                              const isSel = driverIdChosen === dId;
+                              return (
+                                <TouchableOpacity
+                                  key={`drv-v-${dId}`}
+                                  style={{
+                                    backgroundColor: isSel ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 6,
+                                    borderRadius: 8
+                                  }}
+                                  onPress={() => {
+                                    setReassignDriverIdMap(prev => ({ ...prev, [ret.id]: dId }));
+                                  }}
+                                >
+                                  <Text style={{ color: isSel ? '#fff' : theme.text.color, fontSize: 11, fontWeight: '800' }}>
+                                    {dt(g.name || g.delivery_guy_name)}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                          {driverIdChosen && (
+                            <TouchableOpacity
+                              style={{ backgroundColor: '#2563eb', paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                              disabled={actionLoadingId === `sup_${ret.id}`}
+                              onPress={() => handleSupervisorReturnAction(ret.id, 'reassign')}
+                            >
+                              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>
+                                ✅ {lang === 'ar' ? 'تأكيد إعادة الإسناد للمندوب' : 'Confirm Driver Reassignment'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
               );
             }))}
@@ -4957,7 +5074,7 @@ const parseSafeJson = async (res) => {
 
       {/* DISPATCH NEW ORDER WIZARD MODAL (3-STEP SCREEN FLOW) */}
       <Modal visible={createOrderModal} transparent animationType="slide">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDarkMode ? '#334155' : '#cbd5e1', alignSelf: 'center', marginBottom: 12 }} />
@@ -5398,32 +5515,86 @@ const parseSafeJson = async (res) => {
                 </Text>
               </View>
 
-              {/* Monthly Hours Card */}
-              <View style={{
-                backgroundColor: isDarkMode ? '#1e293b' : '#faf5ff',
-                padding: 14,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: isDarkMode ? '#334155' : '#e9d5ff',
-                flexDirection: isRTL ? 'row-reverse' : 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
+              {/* Monthly Hours Card - Clickable for Daily Breakdown */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowDriverDailyBreakdown(!showDriverDailyBreakdown)}
+                style={{
+                  backgroundColor: isDarkMode ? '#1e293b' : '#faf5ff',
+                  padding: 14,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#334155' : '#e9d5ff',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
                   <Text style={{ fontSize: 22 }}>📅</Text>
                   <View>
                     <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
-                      {lang === 'ar' ? 'إجمالي الشهر' : 'Monthly Total'}
+                      {lang === 'ar' ? 'إجمالي الشهر (اضغط للتفاصيل)' : 'Monthly Total (Tap for Daily List)'}
                     </Text>
                     <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]}>
-                      {lang === 'ar' ? 'مجموع ورديات الشهر الحالي' : 'Current month total duty'}
+                      {lang === 'ar' ? 'عرض الساعات اليومية للشهر' : 'Show breakdown by day'}
                     </Text>
                   </View>
                 </View>
-                <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 18 }}>
-                  {workedHoursMonth || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
-                </Text>
-              </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 18 }}>
+                    {workedHoursMonth || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                  </Text>
+                  <Ionicons name={showDriverDailyBreakdown ? "chevron-up" : "chevron-down"} size={18} color="#7c3aed" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Day-by-Day Breakdown List */}
+              {showDriverDailyBreakdown && (
+                <View style={{
+                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                  maxHeight: 180
+                }}>
+                  <Text style={[theme.text, { fontSize: 12, fontWeight: '800', marginBottom: 8 }, isRTL && styles.rtlText]}>
+                    📊 {lang === 'ar' ? 'تفاصيل الساعات اليومية (من 12 منتصف الليل):' : 'Daily Worked Hours (Split at Midnight 12 AM):'}
+                  </Text>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {(() => {
+                      const mySummary = (Array.isArray(shiftSummaries) ? shiftSummaries : []).find(s => String(s.driver_id || s.id) === String(user?.id)) || {};
+                      const breakdown = mySummary.daily_breakdown || [];
+                      if (breakdown.length === 0) {
+                        return (
+                          <Text style={[theme.textMuted, { fontSize: 11, fontStyle: 'italic' }, isRTL && styles.rtlText]}>
+                            {lang === 'ar' ? 'لا توجد بيانات ورديات مسجلة لهذا الشهر' : 'No recorded shifts for this month'}
+                          </Text>
+                        );
+                      }
+                      return breakdown.map((item, idx) => (
+                        <View key={`d-bd-${idx}`} style={{
+                          flexDirection: isRTL ? 'row-reverse' : 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 6,
+                          paddingHorizontal: 8,
+                          borderRadius: 8,
+                          backgroundColor: item.is_today ? (isDarkMode ? '#1e3a8a' : '#dbeafe') : (isDarkMode ? '#1e293b' : '#ffffff')
+                        }}>
+                          <Text style={[theme.text, { fontSize: 12, fontWeight: '700' }]}>
+                            📅 {item.date} {item.is_today ? (lang === 'ar' ? '(اليوم)' : '(Today)') : ''}
+                          </Text>
+                          <Text style={{ color: item.is_today ? '#2563eb' : '#7c3aed', fontWeight: '900', fontSize: 13 }}>
+                            {item.hours} {lang === 'ar' ? 'ساعة' : 'hrs'}
+                          </Text>
+                        </View>
+                      ));
+                    })()}
+                  </ScrollView>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
@@ -5520,12 +5691,60 @@ const parseSafeJson = async (res) => {
                                 <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 15 }}>{dHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
                               </View>
                               <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }} />
-                              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <TouchableOpacity
+                                activeOpacity={0.7}
+                                onPress={() => setShowDriverDailyBreakdown(!showDriverDailyBreakdown)}
+                                style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                              >
                                 <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
-                                  📅 {lang === 'ar' ? 'إجمالي ساعات الشهر:' : 'Monthly Total Hours:'}
+                                  📅 {lang === 'ar' ? 'إجمالي ساعات الشهر (اضغط للتفاصيل):' : 'Monthly Total Hours (Tap for Daily List):'}
                                 </Text>
-                                <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 15 }}>{mHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
-                              </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 15 }}>{mHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                                  <Ionicons name={showDriverDailyBreakdown ? "chevron-up" : "chevron-down"} size={16} color="#7c3aed" />
+                                </View>
+                              </TouchableOpacity>
+
+                              {/* Daily Breakdown List for Supervisor */}
+                              {showDriverDailyBreakdown && (
+                                <View style={{
+                                  backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                                  padding: 10, borderRadius: 10,
+                                  borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                                  marginTop: 4, maxHeight: 150
+                                }}>
+                                  <Text style={[theme.text, { fontSize: 11, fontWeight: '800', marginBottom: 6 }, isRTL && styles.rtlText]}>
+                                    📊 {lang === 'ar' ? 'ساعات كل يوم (من 12 منتصف الليل):' : 'Daily Worked Hours (Split at Midnight):'}
+                                  </Text>
+                                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
+                                    {(drvShift.daily_breakdown || []).length === 0 ? (
+                                      <Text style={[theme.textMuted, { fontSize: 11, fontStyle: 'italic' }, isRTL && styles.rtlText]}>
+                                        {lang === 'ar' ? 'لا توجد ورديات مسجلة لهذا الشهر' : 'No recorded shifts for this month'}
+                                      </Text>
+                                    ) : (
+                                      (drvShift.daily_breakdown || []).map((item, idx) => (
+                                        <View key={`drv-d-${idx}`} style={{
+                                          flexDirection: isRTL ? 'row-reverse' : 'row',
+                                          justify: 'space-between',
+                                          alignItems: 'center',
+                                          paddingVertical: 4,
+                                          paddingHorizontal: 6,
+                                          borderRadius: 6,
+                                          backgroundColor: item.is_today ? (isDarkMode ? '#1e3a8a' : '#dbeafe') : (isDarkMode ? '#1e293b' : '#f8fafc')
+                                        }}>
+                                          <Text style={[theme.text, { fontSize: 11, fontWeight: '700' }]}>
+                                            📅 {item.date} {item.is_today ? (lang === 'ar' ? '(اليوم)' : '(Today)') : ''}
+                                          </Text>
+                                          <Text style={{ color: item.is_today ? '#2563eb' : '#7c3aed', fontWeight: '900', fontSize: 12 }}>
+                                            {item.hours} {lang === 'ar' ? 'ساعة' : 'hrs'}
+                                          </Text>
+                                        </View>
+                                      ))
+                                    )}
+                                  </ScrollView>
+                                </View>
+                              )}
+
                               {hasActive && (
                                 <>
                                   <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }} />
