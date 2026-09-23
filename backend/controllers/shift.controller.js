@@ -36,7 +36,8 @@ exports.clockIn = async (req, res) => {
     // Geofence Distance Calculation & Enforcement
     const distanceMeters = calculateDistanceMeters(numLat, numLng, WAREHOUSE_LAT, WAREHOUSE_LNG);
 
-    if (distanceMeters > WAREHOUSE_RADIUS_METERS && process.env.SKIP_GEOFENCE !== 'true') {
+    const isGeofenceActive = process.env.ENABLE_GEOFENCE === 'true' || process.env.SKIP_GEOFENCE === 'false';
+    if (isGeofenceActive && distanceMeters > WAREHOUSE_RADIUS_METERS) {
       return res.status(400).json({
         error: `Clock-in rejected: You are ${distanceMeters}m away from the warehouse (maximum allowed radius is ${WAREHOUSE_RADIUS_METERS}m).`
       });
@@ -137,7 +138,12 @@ exports.clockOut = async (req, res) => {
 // Calculates daily working hours (resets daily at 00:00) & monthly accumulated hours (resets monthly on 1st at 00:00)
 exports.getShiftSummary = async (req, res) => {
   try {
-    const { driver_id } = req.params;
+    let { driver_id } = req.params;
+
+    // Delivery drivers can only query their own shift hours
+    if (req.user.role === 'delivery_guy') {
+      driver_id = req.user.id;
+    }
 
     // 1. Fetch all delivery drivers
     let driverQuery = `SELECT id, name, username, online_status FROM users WHERE role = 'delivery_guy'`;

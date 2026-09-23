@@ -22,6 +22,9 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://delivery-express-ten.vercel.app"
+      },
+      "android": {
+        "buildType": "apk"
       }
     }
   },

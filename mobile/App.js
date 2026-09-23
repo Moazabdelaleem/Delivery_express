@@ -1408,6 +1408,18 @@ const parseSafeJson = async (res) => {
             }));
           }
         }
+        try {
+          const shRes = await fetch(`${apiBase}/shifts/summary/${user.id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const shData = await parseSafeJson(shRes);
+          if (shRes.ok && shData && shData.summaries && shData.summaries.length > 0) {
+            setWorkedHoursToday(shData.summaries[0].daily_hours || shData.summaries[0].total_hours_today || '0.00');
+            setWorkedHoursMonth(shData.summaries[0].monthly_hours || shData.summaries[0].total_hours_month || '0.00');
+          }
+        } catch (eShift) {
+          console.log('Driver shift summary fetch error:', eShift);
+        }
       } else {
         // Finance, Manager, Supervisor, Inventory
         // Orders already fetched by 401 guard above (setOrders called)
@@ -3394,6 +3406,25 @@ const parseSafeJson = async (res) => {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* Driver Shift Hours Summary Banner */}
+              <View style={{
+                width: '100%',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: 10,
+                paddingTop: 8,
+                borderTopWidth: 1,
+                borderTopColor: 'rgba(255,255,255,0.2)'
+              }}>
+                <Text style={{ color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '700' }}>
+                  ⏱️ {lang === 'ar' ? `ساعات اليوم: ${workedHoursToday} ساعة` : `Today Shift: ${workedHoursToday} hrs`}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '700' }}>
+                  📅 {lang === 'ar' ? `إجمالي الشهر: ${workedHoursMonth} ساعة` : `Monthly Total: ${workedHoursMonth} hrs`}
+                </Text>
+              </View>
             </View>
 
             {/* TAB 1: Active Routes */}
@@ -5371,6 +5402,54 @@ const parseSafeJson = async (res) => {
                           <Text style={{ color: '#ffffff', fontSize: 16, marginTop: 2, fontWeight: '900' }}>{failedCount}</Text>
                         </View>
                       </View>
+
+                      {/* Shift Work Hours Section */}
+                      {(() => {
+                        const drvShift = shiftSummaries.find(s => String(s.driver_id || s.id) === String(driverId)) || {};
+                        const dHrs = drvShift.daily_hours || drvShift.total_hours_today || '0.00';
+                        const mHrs = drvShift.monthly_hours || drvShift.total_hours_month || '0.00';
+                        const hasActive = Boolean(drvShift.has_active_shift);
+                        const activeHrs = drvShift.active_shift_hours || '0.00';
+
+                        return (
+                          <View style={{ marginBottom: 16 }}>
+                            <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginBottom: 8 }, isRTL && styles.rtlText]}>
+                              {lang === 'ar' ? 'ساعات العمل والورديات' : 'Shift Work Hours & Duty'}
+                            </Text>
+                            <View style={{
+                              backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
+                              padding: 14, borderRadius: 14,
+                              borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1',
+                              gap: 10
+                            }}>
+                              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
+                                  ⏱️ {lang === 'ar' ? 'ساعات عمل اليوم:' : 'Daily Worked Hours:'}
+                                </Text>
+                                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 15 }}>{dHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                              </View>
+                              <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }} />
+                              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
+                                  📅 {lang === 'ar' ? 'إجمالي ساعات الشهر:' : 'Monthly Total Hours:'}
+                                </Text>
+                                <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 15 }}>{mHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                              </View>
+                              {hasActive && (
+                                <>
+                                  <View style={{ height: 1, backgroundColor: isDarkMode ? '#334155' : '#e2e8f0' }} />
+                                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={[theme.textMuted, { fontSize: 13, fontWeight: '600' }, isRTL && styles.rtlText]}>
+                                      🟢 {lang === 'ar' ? 'الوردية الحالية (نشط):' : 'Current Active Shift:'}
+                                    </Text>
+                                    <Text style={{ color: '#10b981', fontWeight: '900', fontSize: 14 }}>{activeHrs} {lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                                  </View>
+                                </>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })()}
 
                       {/* Wallet Section */}
                       <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginTop: 4, marginBottom: 10 }, isRTL && styles.rtlText]}>

@@ -13,8 +13,8 @@ router.post('/clock-out', authMiddleware, roleCheck(['delivery_guy']), shiftCont
 // Update background Live GPS location - Delivery Guy
 router.post('/location', authMiddleware, roleCheck(['delivery_guy']), shiftController.updateLocation);
 
-// Read-only worked hours summary - Supervisor, Manager
-router.get('/summary', authMiddleware, roleCheck(['supervisor', 'manager']), shiftController.getShiftSummary);
-router.get('/summary/:driver_id', authMiddleware, roleCheck(['supervisor', 'manager']), shiftController.getShiftSummary);
+// Read-only worked hours summary - Supervisor, Manager, Delivery Guy, Finance, Inventory
+router.get('/summary', authMiddleware, roleCheck(['supervisor', 'manager', 'delivery_guy', 'finance', 'inventory']), shiftController.getShiftSummary);
+router.get('/summary/:driver_id', authMiddleware, roleCheck(['supervisor', 'manager', 'delivery_guy', 'finance', 'inventory']), shiftController.getShiftSummary);
 
 module.exports = router;
