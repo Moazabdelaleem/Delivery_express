@@ -3730,34 +3730,6 @@ const parseSafeJson = async (res) => {
                                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
                                   <TouchableOpacity
                                     style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
-                                    onPress={async () => {
-                                      try {
-                                        const lat = item.latitude ? parseFloat(item.latitude) : null;
-                                        const lng = item.longitude ? parseFloat(item.longitude) : null;
-                                        let url;
-                                        if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
-                                          url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-                                        } else {
-                                          const parsedAddr = parseAddress(item.client_address);
-                                          const addressQuery = parsedAddr.googleMapsQuery || dt(item.client_address);
-                                          if (!addressQuery) {
-                                            Alert.alert(lang === 'ar' ? 'ملاحظة' : 'Notice', lang === 'ar' ? 'لا يوجد عنوان محدد لهذه الشحنة' : 'No address specified for this order');
-                                            return;
-                                          }
-                                          url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery)}`;
-                                        }
-                                        await Linking.openURL(url);
-                                      } catch (err) {
-                                        Alert.alert(lang === 'ar' ? 'خطأ' : 'Error', err.message || (lang === 'ar' ? 'تعذر فتح الخريطة' : 'Could not open map'));
-                                      }
-                                    }}
-                                  >
-                                    <Ionicons name="map-outline" size={14} color="#2563eb" />
-                                    <Text style={{ color: '#2563eb', fontSize: 11, fontWeight: '800' }}>{lang === 'ar' ? 'خرائط' : 'Map'}</Text>
-                                  </TouchableOpacity>
-
-                                  <TouchableOpacity
-                                    style={{ flex: 1, minWidth: 80, backgroundColor: isDarkMode ? '#1e293b' : '#f1f5f9', paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#cbd5e1', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 }}
                                     onPress={() => {
                                       setSelectedCameraOrder(item);
                                       setCameraStage('customer_delivery');

@@ -176,6 +176,10 @@ exports.deleteOrder = async (req, res) => {
 // Reverse / Undo Inventory Handoff (Inventory)
 exports.undoHandoff = async (req, res) => {
   try {
+    if (req.user.role !== 'inventory') {
+      return res.status(403).json({ error: 'Access forbidden: Only inventory staff can undo package handoff.' });
+    }
+
     const { order_id } = req.params;
 
     const orderRes = await db.query('SELECT * FROM orders WHERE id = $1', [order_id]);
@@ -273,6 +277,10 @@ exports.assignOrder = async (req, res) => {
 // Inventory Handoff Confirmation (Inventory)
 exports.inventoryHandoff = async (req, res) => {
   try {
+    if (req.user.role !== 'inventory') {
+      return res.status(403).json({ error: 'Access forbidden: Only inventory staff can confirm package handoff to delivery.' });
+    }
+
     const { order_id } = req.params;
     const { handed_over, note } = req.body;
 
