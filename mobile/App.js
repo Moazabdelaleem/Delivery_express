@@ -755,6 +755,7 @@ function MainApp() {
   const [notification, setNotification] = useState(null);
   const [driverOnline, setDriverOnline] = useState(false);
   const [workedHoursToday, setWorkedHoursToday] = useState('0.00');
+  const [workedHoursMonth, setWorkedHoursMonth] = useState('0.00');
   const [shiftSummaries, setShiftSummaries] = useState([]);
   const [returnsList, setReturnsList] = useState([]);
   const [receiveModal, setReceiveModal] = useState(false);
@@ -5405,7 +5406,7 @@ const parseSafeJson = async (res) => {
 
                       {/* Shift Work Hours Section */}
                       {(() => {
-                        const drvShift = shiftSummaries.find(s => String(s.driver_id || s.id) === String(driverId)) || {};
+                        const drvShift = (Array.isArray(shiftSummaries) ? shiftSummaries : []).find(s => String(s.driver_id || s.id) === String(driverId)) || {};
                         const dHrs = drvShift.daily_hours || drvShift.total_hours_today || '0.00';
                         const mHrs = drvShift.monthly_hours || drvShift.total_hours_month || '0.00';
                         const hasActive = Boolean(drvShift.has_active_shift);
