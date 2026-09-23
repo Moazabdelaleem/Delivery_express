@@ -5497,21 +5497,22 @@ const parseSafeJson = async (res) => {
                 borderColor: isDarkMode ? '#334155' : '#bae6fd',
                 flexDirection: isRTL ? 'row-reverse' : 'row',
                 justifyContent: 'space-between',
-                alignItems: 'center'
+                alignItems: 'center',
+                gap: 8
               }}>
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                   <Text style={{ fontSize: 22 }}>⏱️</Text>
-                  <View>
-                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]} numberOfLines={1}>
                       {lang === 'ar' ? 'ساعات اليوم' : 'Hours Today'}
                     </Text>
-                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]}>
+                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]} numberOfLines={1}>
                       {driverOnline ? (lang === 'ar' ? 'الوردية حية الآن' : 'Shift currently active') : (lang === 'ar' ? 'الوردية متوقفة' : 'Shift off')}
                     </Text>
                   </View>
                 </View>
-                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 18 }}>
-                  {workedHoursToday || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 16, flexShrink: 0 }}>
+                  {workedHoursToday || '0.00'} <Text style={{ fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
                 </Text>
               </View>
 
@@ -5527,25 +5528,26 @@ const parseSafeJson = async (res) => {
                   borderColor: isDarkMode ? '#334155' : '#e9d5ff',
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                   justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  gap: 8
                 }}
               >
-                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                   <Text style={{ fontSize: 22 }}>📅</Text>
-                  <View>
-                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
-                      {lang === 'ar' ? 'إجمالي الشهر (اضغط للتفاصيل)' : 'Monthly Total (Tap for Daily List)'}
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]} numberOfLines={1}>
+                      {lang === 'ar' ? 'إجمالي الشهر' : 'Monthly Total'}
                     </Text>
-                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]}>
-                      {lang === 'ar' ? 'عرض الساعات اليومية للشهر' : 'Show breakdown by day'}
+                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]} numberOfLines={1}>
+                      {lang === 'ar' ? 'اضغط لعرض الساعات اليومية' : 'Tap for daily breakdown'}
                     </Text>
                   </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 18 }}>
-                    {workedHoursMonth || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 16 }}>
+                    {workedHoursMonth || '0.00'} <Text style={{ fontSize: 11, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
                   </Text>
-                  <Ionicons name={showDriverDailyBreakdown ? "chevron-up" : "chevron-down"} size={18} color="#7c3aed" />
+                  <Ionicons name={showDriverDailyBreakdown ? "chevron-up" : "chevron-down"} size={16} color="#7c3aed" />
                 </View>
               </TouchableOpacity>
 
@@ -5601,7 +5603,7 @@ const parseSafeJson = async (res) => {
               style={[styles.cancelButton, { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12 }]}
               onPress={() => setShowShiftHoursModal(false)}
             >
-              <Text style={[styles.cancelButtonText, { color: '#ffffff', fontWeight: '800' }]}>{t('close') || (lang === 'ar' ? 'إغلاق' : 'Close')}</Text>
+              <Text style={[styles.cancelButtonText, { color: '#ffffff', fontWeight: '800' }]}>{lang === 'ar' ? 'إغلاق' : 'Close'}</Text>
             </TouchableOpacity>
           </View>
         </View>
