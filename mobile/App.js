@@ -756,6 +756,8 @@ function MainApp() {
   const [driverOnline, setDriverOnline] = useState(false);
   const [workedHoursToday, setWorkedHoursToday] = useState('0.00');
   const [workedHoursMonth, setWorkedHoursMonth] = useState('0.00');
+  const [showShiftHoursModal, setShowShiftHoursModal] = useState(false);
+  const [showDriverShiftDetailsInModal, setShowDriverShiftDetailsInModal] = useState(false);
   const [shiftSummaries, setShiftSummaries] = useState([]);
   const [returnsList, setReturnsList] = useState([]);
   const [receiveModal, setReceiveModal] = useState(false);
@@ -3408,24 +3410,30 @@ const parseSafeJson = async (res) => {
                 )}
               </TouchableOpacity>
 
-              {/* Driver Shift Hours Summary Banner */}
-              <View style={{
-                width: '100%',
-                flexDirection: isRTL ? 'row-reverse' : 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: 10,
-                paddingTop: 8,
-                borderTopWidth: 1,
-                borderTopColor: 'rgba(255,255,255,0.2)'
-              }}>
-                <Text style={{ color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '700' }}>
-                  ⏱️ {lang === 'ar' ? `ساعات اليوم: ${workedHoursToday} ساعة` : `Today Shift: ${workedHoursToday} hrs`}
+              {/* Clickable Shift Hours Button (Hidden by default to keep UI clean and quiet) */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowShiftHoursModal(true)}
+                style={{
+                  width: '100%',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 10,
+                  paddingVertical: 7,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  backgroundColor: 'rgba(255,255,255,0.18)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.35)'
+                }}
+              >
+                <Ionicons name="time-outline" size={15} color="#ffffff" />
+                <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '800' }}>
+                  {lang === 'ar' ? '⏱️ عرض ساعات العمل' : '⏱️ View Worked Shift Hours'}
                 </Text>
-                <Text style={{ color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '700' }}>
-                  📅 {lang === 'ar' ? `إجمالي الشهر: ${workedHoursMonth} ساعة` : `Monthly Total: ${workedHoursMonth} hrs`}
-                </Text>
-              </View>
+              </TouchableOpacity>
             </View>
 
             {/* TAB 1: Active Routes */}
@@ -5341,6 +5349,88 @@ const parseSafeJson = async (res) => {
 
             <TouchableOpacity style={[styles.cancelButton, { marginTop: 16 }]} onPress={() => { setOrderStatusModal(false); setSelectedOrderForStatus(null); }}>
               <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DRIVER SHIFT HOURS MODAL */}
+      <Modal visible={showShiftHoursModal} transparent animationType="fade" onRequestClose={() => setShowShiftHoursModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, theme.cardBg, { padding: 20, borderRadius: 20 }]}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="time" size={24} color="#2563eb" />
+                <Text style={[styles.modalTitle, theme.text, { marginBottom: 0 }, isRTL && styles.rtlText]}>
+                  {lang === 'ar' ? 'ساعات العمل والإنجاز' : 'Shift & Work Hours'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowShiftHoursModal(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={22} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              {/* Today Hours Card */}
+              <View style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#f0f9ff',
+                padding: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#334155' : '#bae6fd',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: 22 }}>⏱️</Text>
+                  <View>
+                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
+                      {lang === 'ar' ? 'ساعات اليوم' : 'Hours Today'}
+                    </Text>
+                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]}>
+                      {driverOnline ? (lang === 'ar' ? 'الوردية حية الآن' : 'Shift currently active') : (lang === 'ar' ? 'الوردية متوقفة' : 'Shift off')}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ color: '#2563eb', fontWeight: '900', fontSize: 18 }}>
+                  {workedHoursToday || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                </Text>
+              </View>
+
+              {/* Monthly Hours Card */}
+              <View style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#faf5ff',
+                padding: 14,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#334155' : '#e9d5ff',
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: 22 }}>📅</Text>
+                  <View>
+                    <Text style={[theme.text, { fontWeight: '700', fontSize: 14 }, isRTL && styles.rtlText]}>
+                      {lang === 'ar' ? 'إجمالي الشهر' : 'Monthly Total'}
+                    </Text>
+                    <Text style={[theme.textMuted, { fontSize: 11 }, isRTL && styles.rtlText]}>
+                      {lang === 'ar' ? 'مجموع ورديات الشهر الحالي' : 'Current month total duty'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ color: '#7c3aed', fontWeight: '900', fontSize: 18 }}>
+                  {workedHoursMonth || '0.00'} <Text style={{ fontSize: 12, fontWeight: '700' }}>{lang === 'ar' ? 'ساعة' : 'hrs'}</Text>
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12 }]}
+              onPress={() => setShowShiftHoursModal(false)}
+            >
+              <Text style={[styles.cancelButtonText, { color: '#ffffff', fontWeight: '800' }]}>{t('close') || (lang === 'ar' ? 'إغلاق' : 'Close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
