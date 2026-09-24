@@ -2445,10 +2445,10 @@ const parseSafeJson = async (res) => {
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionTitle, theme.text, { fontSize: 18, marginBottom: 2 }, isRTL && styles.rtlText]}>
-                ↩️ {lang === 'ar' ? 'إدارة المرتجعات والتصويت' : 'Returns & Voting Queue'}
+                ↩️ {lang === 'ar' ? 'إدارة المرتجعات والتوجيه' : 'Returns Resolution & Management'}
               </Text>
               <Text style={[theme.textMuted, { fontSize: 12 }, isRTL && styles.rtlText]}>
-                {lang === 'ar' ? 'تصويت المخزن والمشرف للتأكيد والتوجيه' : 'Warehouse & Supervisor dual-verification & voting board'}
+                {lang === 'ar' ? 'فحص وتوجيه الشحنات المرتجعة' : 'Inspect and resolve returned shipments'}
               </Text>
             </View>
             <View style={{ backgroundColor: '#2563eb', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 }}>
@@ -3391,7 +3391,8 @@ const parseSafeJson = async (res) => {
           { id: 'tab1', icon: 'paper-plane-outline', label: t('tabDispatchBoard'), badge: activeOrders.length },
           { id: 'tab2', icon: 'people-outline', label: t('tabDriverRoster'), badge: safeDeliveryGuys.length },
           { id: 'tab3', icon: 'archive-outline', label: t('tabHistory') },
-          { id: 'tab4', icon: 'return-down-back-outline', label: lang === 'ar' ? 'المرتجعات والتصويت' : 'Returns & Votes', badge: returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'vote_conflict', 'awaiting_supervisor_action'].includes(r.status)).length }
+          { id: 'tab4', icon: 'return-down-back-outline', label: lang === 'ar' ? 'إدارة المرتجعات' : 'Returns Management', badge: returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'vote_conflict', 'awaiting_supervisor_action'].includes(r.status)).length },
+          { id: 'tab5', icon: 'receipt-outline', label: lang === 'ar' ? 'مصاريف المندوبين' : 'Expenses Log' }
         ];
       case 'inventory':
         return [
@@ -3616,7 +3617,7 @@ const parseSafeJson = async (res) => {
                               lang === 'ar' ? '✅ تم التأكيد' : '✅ Confirmed',
                               lang === 'ar' ? 'تم إخطار المخزن أنك في الطريق.' : 'Inventory has been notified you are heading back.'
                             );
-                            fetchDataRef.current && fetchDataRef.current();
+                            fetchData();
                           } catch (err) {
                             Alert.alert('Error', err.message);
                           }
@@ -4102,10 +4103,43 @@ const parseSafeJson = async (res) => {
                 )}
               </View>
             )}
-            {/* TAB 4: Returns & Votes */}
+            {/* TAB 4: Returns Management */}
             {activeTab === 'tab4' && (
               <View>
                 {renderMobileReturnsQueue('supervisor')}
+              </View>
+            )}
+            {/* TAB 5: Driver Expenses Log */}
+            {activeTab === 'tab5' && (
+              <View>
+                <Text style={[styles.sectionTitle, theme.text, isRTL && styles.rtlText]}>
+                  🧾 {lang === 'ar' ? 'مصاريف المندوبين المسجلة' : 'Driver Expenses Log'}
+                </Text>
+                {!expensesBreakdown?.breakdown || expensesBreakdown.breakdown.length === 0 ? (
+                  <Text style={[styles.emptyText, theme.textMuted]}>{t('execNoExpensesYet')}</Text>
+                ) : (
+                  expensesBreakdown.breakdown.map((exp) => (
+                    <View key={exp.id} style={[styles.orderCard, theme.cardBg, styles.statCardAccentPurple, { paddingVertical: 12 }]}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[theme.text, { fontWeight: '800', fontSize: 14 }]}>{dt(exp.delivery_guy_name)}</Text>
+                        <Text style={[{ color: '#ef4444', fontWeight: '900', fontSize: 16 }]}>-${parseFloat(exp.amount).toFixed(2)}</Text>
+                      </View>
+                      <Text style={[theme.text, { fontWeight: '700', marginTop: 4 }, isRTL && styles.rtlText]}>{dt(exp.reason)}</Text>
+                      {exp.order_tracking_number ? (
+                        <Text style={[{ color: '#2563eb', fontSize: 12, fontWeight: '800', marginTop: 4 }, isRTL && styles.rtlText]}>
+                          📦 {lang === 'ar' ? 'مرتبط بالشحنة: ' : 'Linked Order: '}#{exp.order_tracking_number}
+                        </Text>
+                      ) : (
+                        <Text style={[{ color: '#6b7280', fontSize: 11, fontStyle: 'italic', marginTop: 4 }, isRTL && styles.rtlText]}>
+                          🏷️ {lang === 'ar' ? 'مصروف عام (بنزين / عهدة عامة)' : 'General Expense (Fuel / Allowance)'}
+                        </Text>
+                      )}
+                      <Text style={[theme.textMuted, { fontSize: 11, marginTop: 4 }, isRTL && styles.rtlText]}>
+                        ⏱️ {new Date(exp.created_at).toLocaleString()}
+                      </Text>
+                    </View>
+                  ))
+                )}
               </View>
             )}
           </View>
@@ -5034,7 +5068,7 @@ const parseSafeJson = async (res) => {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.primaryButtonText}>
-                    ✅ {lang === 'ar' ? 'تأكيد الاستلام بالمخزن والتحويل للتصويت' : 'Confirm Receipt & Push to Vote Queue'}
+                    ✅ {lang === 'ar' ? 'تأكيد الاستلام بالمخزن' : 'Confirm Receipt at Warehouse'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -5820,6 +5854,44 @@ const parseSafeJson = async (res) => {
                           </TouchableOpacity>
                         ))
                       )}
+                      {/* Driver's Logged Expenses */}
+                      <Text style={[styles.sectionTitle, theme.text, { fontSize: 14, marginTop: 12, marginBottom: 8 }, isRTL && styles.rtlText]}>
+                        🧾 {lang === 'ar' ? 'مصاريف المندوب المسجلة:' : "Driver's Logged Expenses:"}
+                      </Text>
+                      {(() => {
+                        const driverExpList = (expensesBreakdown?.breakdown || []).filter(e => String(e.delivery_guy_id) === String(driverId));
+                        if (driverExpList.length === 0) {
+                          return (
+                            <Text style={[styles.emptyText, theme.textMuted, { fontSize: 12, marginBottom: 12 }]}>
+                              {lang === 'ar' ? 'لم يقم المندوب بتسجيل أي مصاريف حتى الآن' : 'No expenses logged by this driver yet.'}
+                            </Text>
+                          );
+                        }
+                        return driverExpList.map(exp => (
+                          <View key={`drv-exp-${exp.id}`} style={{
+                            backgroundColor: isDarkMode ? '#1e293b' : '#fff5f5',
+                            padding: 10, borderRadius: 10, marginBottom: 8,
+                            borderWidth: 1, borderColor: isDarkMode ? '#334155' : '#fca5a5'
+                          }}>
+                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={[theme.text, { fontWeight: '800', fontSize: 13 }]}>{dt(exp.reason)}</Text>
+                              <Text style={{ color: '#dc2626', fontWeight: '900', fontSize: 14 }}>-${parseFloat(exp.amount).toFixed(2)}</Text>
+                            </View>
+                            {exp.order_tracking_number ? (
+                              <Text style={{ color: '#2563eb', fontSize: 11, fontWeight: '800', marginTop: 4 }}>
+                                📦 {lang === 'ar' ? 'مرتبط بالشحنة: ' : 'Linked Order: '}#{exp.order_tracking_number}
+                              </Text>
+                            ) : (
+                              <Text style={{ color: '#6b7280', fontSize: 11, fontStyle: 'italic', marginTop: 4 }}>
+                                🏷️ {lang === 'ar' ? 'مصروف عام (بنزين / عهدة عامة)' : 'General Expense (Fuel / Allowance)'}
+                              </Text>
+                            )}
+                            <Text style={[theme.textMuted, { fontSize: 10, marginTop: 4 }]}>
+                              ⏱️ {new Date(exp.created_at).toLocaleString()}
+                            </Text>
+                          </View>
+                        ));
+                      })()}
                     </View>
                   );
                 })()}
