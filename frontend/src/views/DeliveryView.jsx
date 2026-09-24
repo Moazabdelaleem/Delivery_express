@@ -902,7 +902,7 @@ function OrderCard({ order: o, submitting, onChangeStatus, onFail, onSelectOutco
       </div>
 
       <div className="row-actions">
-        {['in_transit', 'handed_to_delivery'].includes(o.status) && (
+        {['in_transit'].includes(o.status) && (
           <button className="btn btn-primary btn-sm" style={{ background: 'var(--clr-success)', borderColor: 'var(--clr-success)', fontWeight: 700 }} onClick={() => onSelectOutcome(o)}>
             📋 Complete Delivery & Payment
           </button>

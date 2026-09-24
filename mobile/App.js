@@ -3692,13 +3692,21 @@ const parseSafeJson = async (res) => {
 
                           {/* Always Visible Primary Delivery Actions */}
                           <View style={{ marginTop: 6, gap: 8 }}>
-                            {['handed_to_delivery', 'assigned', 'notified_inventory', 'created'].includes(item.status) ? (
+                            {item.status === 'handed_to_delivery' ? (
                               <TouchableOpacity
-                                style={[styles.actionBtn, { backgroundColor: '#2563eb', borderRadius: 12 }]}
+                                style={[styles.actionBtn, { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 12 }]}
                                 onPress={() => updateDeliveryStatus(item.id, 'in_transit')}
                               >
-                                <Text style={styles.actionBtnText}>{t('startTransit')}</Text>
+                                <Text style={[styles.actionBtnText, { fontSize: 14, fontWeight: '800' }]}>
+                                  🚚 {t('startTransit')}
+                                </Text>
                               </TouchableOpacity>
+                            ) : ['assigned', 'notified_inventory', 'created'].includes(item.status) ? (
+                              <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#fffbe8', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a', alignItems: 'center' }}>
+                                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '800' }}>
+                                  ⏳ {lang === 'ar' ? 'في انتظار تسليم الشحنة من المخزن' : 'Awaiting Warehouse Inventory Handoff'}
+                                </Text>
+                              </View>
                             ) : null}
 
                             {item.status === 'in_transit' ? (
@@ -5385,7 +5393,7 @@ const parseSafeJson = async (res) => {
               </View>
             )}
 
-            {selectedOrderForStatus && ['handed_to_delivery', 'assigned', 'notified_inventory', 'created'].includes(selectedOrderForStatus.status) && (
+            {selectedOrderForStatus && selectedOrderForStatus.status === 'handed_to_delivery' && (
               <View style={{ marginTop: 12 }}>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#2563eb' }]}
@@ -5396,8 +5404,16 @@ const parseSafeJson = async (res) => {
                     updateDeliveryStatus(id, 'in_transit');
                   }}
                 >
-                  <Text style={styles.actionBtnText}> {t('startTransit')}</Text>
+                  <Text style={styles.actionBtnText}> 🚚 {t('startTransit')}</Text>
                 </TouchableOpacity>
+              </View>
+            )}
+
+            {selectedOrderForStatus && ['assigned', 'notified_inventory', 'created'].includes(selectedOrderForStatus.status) && (
+              <View style={{ marginTop: 12, backgroundColor: isDarkMode ? '#1e293b' : '#fffbe8', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#fde68a', alignItems: 'center' }}>
+                <Text style={{ color: '#d97706', fontSize: 13, fontWeight: '800' }}>
+                  ⏳ {lang === 'ar' ? 'في انتظار تسليم الشحنة من المخزن' : 'Awaiting Warehouse Inventory Handoff'}
+                </Text>
               </View>
             )}
 

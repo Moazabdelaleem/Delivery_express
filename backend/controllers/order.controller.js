@@ -3,11 +3,11 @@ const { DELIVERY_OUTCOMES, getOutcomeByKey, findOutcome, COLLECTION_FILTER_MAP }
 const { sendPushNotification, sendPushToRole } = require('../utils/pushNotifier');
 
 // Sequential status flow rules (server-side enforcement)
-// handed_to_delivery → in_transit (driver picks up from warehouse)
+// handed_to_delivery → in_transit (driver picks up from warehouse after inventory handoff)
 // in_transit → delivered | delivery_failed (driver completes or fails)
 // delivery_failed → returned_to_company (driver returns package)
 const VALID_PREDECESSORS = {
-  in_transit:          ['handed_to_delivery', 'assigned', 'notified_inventory', 'created'],
+  in_transit:          ['handed_to_delivery'],
   delivered:           ['in_transit', 'handed_to_delivery'],
   delivery_failed:     ['in_transit', 'handed_to_delivery'],
   returned_to_company: ['delivery_failed']
@@ -443,6 +443,14 @@ exports.updateDeliveryStatus = async (req, res) => {
 
     // Handle in_transit transition immediately without outcome requirement
     if (status === 'in_transit') {
+      if (oldStatus !== 'handed_to_delivery') {
+        await client.query('ROLLBACK');
+        client.release();
+        return res.status(400).json({
+          error: `Cannot start transit for order #${order.tracking_number}: package has not been handed over by warehouse inventory yet (Current status: '${oldStatus}'). Warehouse handoff must be confirmed by inventory staff first.`
+        });
+      }
+
       const updateRes = await client.query(
         `UPDATE orders SET status = 'in_transit', updated_at = NOW() WHERE id = $1 RETURNING *`,
         [order_id]
