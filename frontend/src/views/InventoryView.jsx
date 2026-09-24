@@ -573,6 +573,13 @@ export default function InventoryView({ token }) {
               Order <strong>#{receiveModal.tracking_number}</strong> — {receiveModal.return_type === 'full' ? 'Full Return' : 'Partial Return'}
             </p>
             <form onSubmit={confirmReceive}>
+              <PhotoCapture
+                orderId={receiveModal.order_id}
+                stage="return_verification"
+                required={true}
+                token={token}
+                label="📷 Return Proof Photo Attachment"
+              />
               <div className="form-group" style={{ marginBottom: 14 }}>
                 <label className="form-label">⚠️ Damaged or Missing Items Count</label>
                 <input

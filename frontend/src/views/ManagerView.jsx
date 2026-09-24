@@ -100,9 +100,30 @@ export default function ManagerView({ token }) {
     }
   };
 
+  const handleManagerOverride = async (returnId, vote) => {
+    setSub(s => ({ ...s, [returnId]: vote }));
+    try {
+      const driverId = reassignDriverMap[returnId] || null;
+      await managerOverrideReturn(returnId, { vote, driver_id: driverId ? parseInt(driverId) : undefined }, token);
+      toast.success(`Executive override executed: ${vote.toUpperCase()}`);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(s => { const n = { ...s }; delete n[returnId]; return n; });
+    }
+  };
+
   const totalRevenue = orders
     .filter(o => o.status === 'cash_cleared')
     .reduce((s, o) => s + parseFloat(o.order_amount || 0), 0);
+
+  const conflicts = returns.filter(r => r.status === 'vote_conflict' || r.status === 'awaiting_second_vote');
+
+  const counts = orders.reduce((acc, o) => {
+    acc[o.status] = (acc[o.status] || 0) + 1;
+    return acc;
+  }, {});
 
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
 
