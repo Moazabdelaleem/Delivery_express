@@ -1520,6 +1520,7 @@ const parseSafeJson = async (res) => {
           });
           const retQueueData = await parseSafeJson(retQueueRes);
           if (Array.isArray(retQueueData)) setReturnsList(retQueueData);
+          else if (retQueueData && Array.isArray(retQueueData.returns)) setReturnsList(retQueueData.returns);
         } catch (eRet) {
           console.log('Returns queue fetch error:', eRet);
         }
@@ -2426,8 +2427,8 @@ const parseSafeJson = async (res) => {
   const renderMobileReturnsQueue = (currentRole) => {
     const voteConflicts = returnsList.filter(r => r.status === 'vote_conflict');
     const inboundReturns = returnsList.filter(r => r.status === 'in_transit_back' || r.status === 'pending_pickup');
-    const votingQueue = returnsList.filter(r => r.status === 'pending_verification' || r.status === 'awaiting_second_vote');
-    const closedHistory = returnsList.filter(r => ['resolved_killed', 'resolved_reassigned', 'cancelled'].includes(r.status));
+    const votingQueue = returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'awaiting_supervisor_action'].includes(r.status));
+    const closedHistory = returnsList.filter(r => ['resolved_killed', 'resolved_reassigned', 'cancelled', 'verified', 'reassigned'].includes(r.status));
 
     const totalCount = returnsList.length;
 
@@ -3390,13 +3391,13 @@ const parseSafeJson = async (res) => {
           { id: 'tab1', icon: 'paper-plane-outline', label: t('tabDispatchBoard'), badge: activeOrders.length },
           { id: 'tab2', icon: 'people-outline', label: t('tabDriverRoster'), badge: safeDeliveryGuys.length },
           { id: 'tab3', icon: 'archive-outline', label: t('tabHistory') },
-          { id: 'tab4', icon: 'return-down-back-outline', label: lang === 'ar' ? 'المرتجعات والتصويت' : 'Returns & Votes', badge: returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'vote_conflict'].includes(r.status)).length }
+          { id: 'tab4', icon: 'return-down-back-outline', label: lang === 'ar' ? 'المرتجعات والتصويت' : 'Returns & Votes', badge: returnsList.filter(r => ['pending_verification', 'awaiting_second_vote', 'vote_conflict', 'awaiting_supervisor_action'].includes(r.status)).length }
         ];
       case 'inventory':
         return [
           { id: 'tab1', icon: 'home-outline', label: t('tabWarehouseQueue'), badge: inventoryQueue.length },
           { id: 'tab2', icon: 'alert-circle-outline', label: t('tabStagingIssues'), badge: inventoryIssues.length },
-          { id: 'tab3', icon: 'return-down-back-outline', label: lang === 'ar' ? 'مرتجعات المحطة' : 'Returns Queue', badge: returnsList.filter(r => ['in_transit_back', 'pending_verification', 'awaiting_second_vote', 'vote_conflict'].includes(r.status)).length }
+          { id: 'tab3', icon: 'return-down-back-outline', label: lang === 'ar' ? 'مرتجعات المحطة' : 'Returns Queue', badge: returnsList.filter(r => ['in_transit_back', 'pending_verification', 'awaiting_second_vote', 'vote_conflict', 'awaiting_supervisor_action'].includes(r.status)).length }
         ];
       case 'finance':
         return [
@@ -3560,7 +3561,7 @@ const parseSafeJson = async (res) => {
                 {renderSearchAndSortHeader()}
 
                 {/* ── Return to Warehouse Cards ── */}
-                {returnPickups.filter(r => ['pending_pickup','in_transit_back'].includes(r.status)).map(ret => (
+                {returnPickups.filter(r => ['pending_pickup','in_transit_back','pending_verification','awaiting_second_vote','vote_conflict','awaiting_supervisor_action'].includes(r.status)).map(ret => (
                   <View key={`ret-${ret.id}`} style={{
                     backgroundColor: '#fffbeb',
                     borderRadius: 18,
@@ -3635,7 +3636,7 @@ const parseSafeJson = async (res) => {
                   </View>
                 ))}
 
-                {filterAndSortOrders(activeOrders).length === 0 && returnPickups.filter(r => ['pending_pickup','in_transit_back'].includes(r.status)).length === 0 ? (
+                {filterAndSortOrders(activeOrders).length === 0 && returnPickups.filter(r => ['pending_pickup','in_transit_back','pending_verification','awaiting_second_vote','vote_conflict','awaiting_supervisor_action'].includes(r.status)).length === 0 ? (
                   <Text style={[styles.emptyText, theme.textMuted]}>{t('noDeliveries')}</Text>
                 ) : filterAndSortOrders(activeOrders).length === 0 ? null : (
                   filterAndSortOrders(activeOrders).map((item) => {

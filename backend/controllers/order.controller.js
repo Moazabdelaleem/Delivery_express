@@ -616,7 +616,7 @@ exports.updateDeliveryStatus = async (req, res) => {
     // Prompt 3: Auto-create return record when delivery outcome indicates returned portion
     if (retAmount > 0 || ['partial', 'none', 'not_shipped'].includes(deliveryOutcome)) {
       const existingReturn = await client.query(
-        `SELECT id FROM returns WHERE order_id = $1 AND status IN ('pending_pickup', 'pending_verification')`,
+        `SELECT id FROM returns WHERE order_id = $1 AND status NOT IN ('cancelled', 'verified', 'reassigned')`,
         [order_id]
       );
       if (existingReturn.rows.length === 0) {
@@ -628,7 +628,7 @@ exports.updateDeliveryStatus = async (req, res) => {
                         `Automatic return record for ${deliveryOutcome || 'delivery'} outcome`;
         await client.query(
           `INSERT INTO returns (order_id, initiated_by, return_type, reason, status, returned_items_amount, returned_quantity)
-           VALUES ($1, $2, $3, $4, 'pending_verification', $5, $6)`,
+           VALUES ($1, $2, $3, $4, 'pending_pickup', $5, $6)`,
           [order_id, req.user.id, rType, rReason, retAmount, parseInt(returned_quantity) || 0]
         );
       }
