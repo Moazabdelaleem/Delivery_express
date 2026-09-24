@@ -178,7 +178,8 @@ export default function DeliveryView({ token, user }) {
     const payload = {
       delivery_outcome: step1Outcome,
       collection_outcome: step2Outcome,
-      payment_method: step2Outcome === 'none' ? 'none' : step3PaymentMethod
+      payment_method: step2Outcome === 'none' ? 'none' : step3PaymentMethod,
+      payment_amount: step2Outcome === 'none' ? 0 : parseFloat(payAmt || 0)
     };
 
     if (step1Outcome === 'partial') {
@@ -602,6 +603,13 @@ export default function DeliveryView({ token, user }) {
                   </div>
                 </div>
 
+                {step2Outcome === 'shipping_fee_only' && (
+                  <div style={{ background: 'rgba(37,99,235,0.08)', padding: '10px 14px', borderRadius: 'var(--r-sm)', border: '1px solid #bfdbfe', marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: 'var(--clr-accent)', fontWeight: 700, display: 'block' }}>🚚 Shipping Fee Only Collected:</span>
+                    <span style={{ fontSize: 12 }}>Please select payment method and enter the shipping fee amount collected manually below.</span>
+                  </div>
+                )}
+
                 <div className="form-group" style={{ marginBottom: 16 }}>
                   <label className="form-label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>Select Payment Method:</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -629,6 +637,22 @@ export default function DeliveryView({ token, user }) {
                       );
                     })}
                   </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: 8, display: 'block' }}>
+                    {step2Outcome === 'shipping_fee_only' ? 'Shipping Fee Amount Collected (EGP) *' : 'Collected Payment Amount (EGP)'}
+                  </label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={payAmt}
+                    onChange={e => setPayAmt(e.target.value)}
+                    required={step2Outcome === 'shipping_fee_only'}
+                  />
                 </div>
 
                 <PhotoCapture

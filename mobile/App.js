@@ -6647,9 +6647,27 @@ const parseSafeJson = async (res) => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.primaryButton, { flex: 1, backgroundColor: '#10b981' }]}
-                    onPress={() => setOutcomeStep(3)}
+                    onPress={() => {
+                      if (step2Outcome === 'none') {
+                        setStep3PaymentMethod('none');
+                        setPaymentAmountInput('0.00');
+                        setOutcomeStep(4);
+                      } else {
+                        if (step2Outcome === 'shipping_fee_only') {
+                          if (step3PaymentMethod === 'none') setStep3PaymentMethod('cash');
+                          if (paymentAmountInput === String(selectedOrderForOutcome?.order_amount || '') || paymentAmountInput === '0.00') {
+                            setPaymentAmountInput('');
+                          }
+                        }
+                        setOutcomeStep(3);
+                      }
+                    }}
                   >
-                    <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (طريقة الدفع) ←' : 'Next (Payment) →'}</Text>
+                    <Text style={styles.primaryButtonText}>
+                      {step2Outcome === 'none'
+                        ? (lang === 'ar' ? 'التالي (الإثبات النهائي) ←' : 'Next (Final Proof) →')
+                        : (lang === 'ar' ? 'التالي (طريقة الدفع) ←' : 'Next (Payment) →')}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -6680,6 +6698,17 @@ const parseSafeJson = async (res) => {
                     </Text>
                   </View>
                 </View>
+
+                {step2Outcome === 'shipping_fee_only' && (
+                  <View style={{ backgroundColor: isDarkMode ? '#1e293b' : '#eff6ff', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#bfdbfe', marginBottom: 14 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#2563eb' }}>
+                      🚚 {lang === 'ar' ? 'تحصيل مصاريف الشحن فقط:' : 'Shipping Fee Only Collected:'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: theme.text.color, marginTop: 4 }}>
+                      {lang === 'ar' ? 'اختر طريقة الدفع للمصاريف وأدخل المبلغ المحصل يدوياً بالأسفل.' : 'Select payment method and enter the collected shipping fee amount manually below.'}
+                    </Text>
+                  </View>
+                )}
 
                 <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginBottom: 8 }, isRTL && styles.rtlText]}>
                   {lang === 'ar' ? 'اختر طريقة التحصيل والدفع:' : 'Select Payment Method:'}
@@ -6719,12 +6748,14 @@ const parseSafeJson = async (res) => {
                 })}
 
                 <Text style={[styles.inputLabel, theme.text, { fontSize: 13, fontWeight: '800', marginTop: 10 }, isRTL && styles.rtlText]}>
-                  {lang === 'ar' ? 'المبلغ المحصل (جنيه):' : 'Collected Payment Amount (EGP):'}
+                  {step2Outcome === 'shipping_fee_only'
+                    ? (lang === 'ar' ? 'مبلغ مصاريف الشحن المحصل يدوياً (جنيه): *' : 'Shipping Fee Amount Collected Manually (EGP): *')
+                    : (lang === 'ar' ? 'المبلغ المحصل (جنيه):' : 'Collected Payment Amount (EGP):')}
                 </Text>
                 <TextInput
                   style={[styles.input, theme.inputBg, theme.text, isRTL && styles.rtlText]}
                   keyboardType="numeric"
-                  placeholder="0.00"
+                  placeholder={step2Outcome === 'shipping_fee_only' ? (lang === 'ar' ? 'أدخل قيمة الشحن (مثال: 50.00)' : 'Enter shipping fee (e.g. 50.00)') : "0.00"}
                   value={paymentAmountInput}
                   onChangeText={setPaymentAmountInput}
                 />
@@ -6754,7 +6785,16 @@ const parseSafeJson = async (res) => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.primaryButton, { flex: 1, backgroundColor: '#8b5cf6' }]}
-                    onPress={() => setOutcomeStep(4)}
+                    onPress={() => {
+                      if (step2Outcome === 'shipping_fee_only' && (!paymentAmountInput || parseFloat(paymentAmountInput) <= 0)) {
+                        Alert.alert(
+                          lang === 'ar' ? 'مطلوب إدخال المبلغ' : 'Amount Required',
+                          lang === 'ar' ? 'يرجى إدخال مبلغ مصاريف الشحن المحصل يدوياً.' : 'Please enter the collected shipping fee amount manually.'
+                        );
+                        return;
+                      }
+                      setOutcomeStep(4);
+                    }}
                   >
                     <Text style={styles.primaryButtonText}>{lang === 'ar' ? 'التالي (الإثبات النهائي) ←' : 'Next (Final Proof) →'}</Text>
                   </TouchableOpacity>
@@ -6781,9 +6821,11 @@ const parseSafeJson = async (res) => {
                     </Text>
                   </View>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 11, color: '#047857', fontWeight: '700' }}>{lang === 'ar' ? 'طريقة والدفع:' : 'Payment Method:'}</Text>
+                    <Text style={{ fontSize: 11, color: '#047857', fontWeight: '700' }}>{lang === 'ar' ? 'التحصيل والدفع:' : 'Payment & Collection:'}</Text>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: theme.text.color }}>
-                      {PAYMENT_METHODS_STEP3.find(s => s.value === step3PaymentMethod)?.[lang === 'ar' ? 'label_ar' : 'label_en']} ({paymentAmountInput || '0'} EGP)
+                      {step2Outcome === 'none'
+                        ? (lang === 'ar' ? 'بدون تحصيل (0 جنيه)' : 'No Collection (0.00 EGP)')
+                        : `${PAYMENT_METHODS_STEP3.find(s => s.value === step3PaymentMethod)?.[lang === 'ar' ? 'label_ar' : 'label_en']} (${paymentAmountInput || '0'} EGP)`}
                     </Text>
                   </View>
                 </View>
@@ -6834,7 +6876,7 @@ const parseSafeJson = async (res) => {
                 />
 
                 <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 16, marginBottom: 16 }}>
-                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(3)}>
+                  <TouchableOpacity style={[styles.cancelButton, { flex: 1 }]} onPress={() => setOutcomeStep(step2Outcome === 'none' ? 2 : 3)}>
                     <Text style={styles.cancelButtonText}>{lang === 'ar' ? '← رجوع' : '← Back'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
