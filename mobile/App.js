@@ -3424,7 +3424,7 @@ const parseSafeJson = async (res) => {
   return (
     <SafeAreaView style={[styles.container, theme.bg]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
       {/* Top Header */}
       <View style={[styles.appHeader, theme.cardBg, { flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 6 }]}>
@@ -4860,7 +4860,7 @@ const parseSafeJson = async (res) => {
 
       {/* EXPENSE MODAL */}
       <Modal visible={expenseModal} transparent animationType="slide">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>{t('logPocketExpenseTitle')}</Text>
@@ -4978,7 +4978,7 @@ const parseSafeJson = async (res) => {
 
       {/* PHYSICAL RECEIPT MODAL FOR INVENTORY */}
       <Modal visible={receiveModal} transparent animationType="slide">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
               <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: isDarkMode ? '#334155' : '#cbd5e1', alignSelf: 'center', marginBottom: 12 }} />
@@ -6245,7 +6245,7 @@ const parseSafeJson = async (res) => {
 
       {/* FINANCE TOPUP MODAL */}
       <Modal visible={topupModal} transparent animationType="slide">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg]}>
             <Text style={[styles.modalTitle, theme.text, isRTL && styles.rtlText]}>
@@ -6418,7 +6418,7 @@ const parseSafeJson = async (res) => {
 
       {/* Delivery Outcome Selection Modal (4-Step Wizard Flow + Modern UI) */}
       <Modal visible={outcomeModal} transparent animationType="slide">
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, theme.cardBg, { maxHeight: '90%' }]}>
 
