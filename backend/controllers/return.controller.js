@@ -604,13 +604,22 @@ exports.getReturnsQueue = async (req, res) => {
     let queryStr = `
       SELECT r.*,
              o.tracking_number, o.client_address, o.order_amount,
-             o.delivery_outcome, o.collection_outcome,
+             o.delivery_outcome, o.collection_outcome, o.delivery_guy_id,
              o.returned_items_amount, o.items_resolution,
              u_init.name as initiated_by_name, u_init.role as initiated_by_role,
              u_ver.name as verified_by_name,
              u_drv.name as driver_name, u_drv.phone as driver_phone,
              u_rd.name as reassign_driver_name,
-             u_mo.name as manager_override_by_name
+             u_mo.name as manager_override_by_name,
+             EXISTS (
+               SELECT 1 FROM order_attachments oa
+               WHERE oa.order_id = r.order_id AND oa.stage = 'return_verification'
+             ) as has_return_photo,
+             (
+               SELECT oa.id FROM order_attachments oa
+               WHERE oa.order_id = r.order_id AND oa.stage = 'return_verification'
+               LIMIT 1
+             ) as proof_attachment_id
       FROM returns r
       JOIN orders o ON r.order_id = o.id
       JOIN users u_init ON r.initiated_by = u_init.id
@@ -802,12 +811,12 @@ exports.supervisorAction = async (req, res) => {
     const { return_id } = req.params;
     const { action, reassign_driver_id } = req.body || {};
 
-    if (!['reassign', 'keep_as_is'].includes(action)) {
-      return res.status(400).json({ error: "Action must be 'reassign' or 'keep_as_is'." });
+    if (!['reassign', 'keep_as_is', 'cancel'].includes(action)) {
+      return res.status(400).json({ error: "Action must be 'reassign', 'keep_as_is', or 'cancel'." });
     }
 
     const returnRes = await db.query(
-      `SELECT r.*, o.tracking_number, o.delivery_guy_id, o.supervisor_id
+      `SELECT r.*, o.tracking_number, o.delivery_guy_id, o.supervisor_id, o.status as order_status
        FROM returns r JOIN orders o ON r.order_id = o.id
        WHERE r.id = $1`,
       [return_id]
@@ -842,6 +851,28 @@ exports.supervisorAction = async (req, res) => {
       );
 
       return res.json({ message: 'Order successfully reassigned to driver.', action: 'reassign', driver_id: targetDriverId });
+    } else if (action === 'cancel') {
+      await db.query(
+        `UPDATE returns SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+        [return_id]
+      );
+      await db.query(
+        `UPDATE orders SET items_resolution = 'cancelled', status = 'delivery_failed', updated_at = NOW() WHERE id = $1`,
+        [ret.order_id]
+      );
+
+      await db.query(
+        `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, comment)
+         VALUES ($1, $2, 'delivery_failed', $3, 'Order cancelled by supervisor on returns board')`,
+        [ret.order_id, ret.order_status, req.user.id]
+      );
+
+      if (io) {
+        io.to('role_supervisor').to('role_inventory').to('role_manager')
+          .emit('return_updated', { return_id, order_id: ret.order_id, status: 'cancelled' });
+      }
+
+      return res.json({ message: 'Order cancelled successfully. Order marked dead/cancelled.', action: 'cancel' });
     } else {
       // keep_as_is
       await db.query(
