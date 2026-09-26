@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
 import { getAllWallets, pulloutCollection, topupPocket, getExpenses, getDriverLedger, getGlobalAudit, getPendingPayments, confirmPayment, rejectPayment, getAllOrders, settleOrderLiability } from '../api.js';
+import SmartFilterBar from '../components/SmartFilterBar.jsx';
 import { toast } from '../App.jsx';
 import { useWindowFocus } from '../useWindowFocus.js';
 
@@ -24,6 +24,59 @@ export default function FinanceView({ token }) {
   const [topupNote, setTopupNote]       = useState('');
   const [submitting, setSub]            = useState(false);
   const [activeTab, setActiveTab]       = useState('pending');
+  const [selectedPayments, setSelectedPayments] = useState([]);
+  const [searchQuery, setSearchQuery]   = useState('');
+  const [filter, setFilter]             = useState('all');
+
+  const toggleSelectPayment = (id) => {
+    setSelectedPayments(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkConfirmPayments = async () => {
+    if (selectedPayments.length === 0) return;
+    if (!window.confirm(`Bulk confirm ${selectedPayments.length} payment(s)?`)) return;
+    setSub(true);
+    let successCount = 0;
+    try {
+      for (const pmtId of selectedPayments) {
+        try {
+          await confirmPayment(pmtId, token);
+          successCount++;
+        } catch (_) {}
+      }
+      toast.success(`Successfully confirmed ${successCount} payment(s)!`);
+      setSelectedPayments([]);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(false);
+    }
+  };
+
+  const handleBulkRejectPayments = async () => {
+    if (selectedPayments.length === 0) return;
+    if (!window.confirm(`Bulk reject ${selectedPayments.length} payment submission(s)?`)) return;
+    setSub(true);
+    let count = 0;
+    try {
+      for (const pmtId of selectedPayments) {
+        try {
+          await rejectPayment(pmtId, token);
+          count++;
+        } catch (_) {}
+      }
+      toast.success(`Rejected ${count} payment submission(s).`);
+      setSelectedPayments([]);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSub(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -241,13 +294,64 @@ export default function FinanceView({ token }) {
         </button>
       </div>
 
+      {/* Smart Search & Filter Bar */}
+      <SmartFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        activeFilter={filter}
+        onFilterChange={setFilter}
+        filterOptions={[
+          { id: 'all', label: `Pending Payments (${pendingPayments.length})` },
+          { id: 'wallets', label: `Driver Wallets (${wallets.length})` },
+          { id: 'liable', label: `⚠️ Liable (${liableOrders.length})` }
+        ]}
+      />
+
       {activeTab === 'pending' && (
         <div className="card">
+          {selectedPayments.length > 0 && (
+            <div className="bulk-action-bar">
+              <div className="bulk-action-title">
+                💰 Bulk Finance Operation: {selectedPayments.length} payment submission(s) selected
+              </div>
+              <div className="bulk-action-btns">
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={handleBulkConfirmPayments}
+                  disabled={submitting}
+                >
+                  {submitting ? <span className="spinner" /> : '✓ Approve Selected Payments'}
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={handleBulkRejectPayments}
+                  disabled={submitting}
+                >
+                  {submitting ? <span className="spinner" /> : '✕ Reject Selected'}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setSelectedPayments([])}
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card-header">
             <span className="card-title">⏳ Order Payments Awaiting Finance Confirmation</span>
-            <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>
-              Confirming cash payments will deposit the amount to collection wallets. E-payments are recorded directly.
-            </span>
+            {pendingPayments.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  if (selectedPayments.length === pendingPayments.length) setSelectedPayments([]);
+                  else setSelectedPayments(pendingPayments.map(p => p.id));
+                }}
+              >
+                {selectedPayments.length === pendingPayments.length ? 'Deselect All' : 'Select All Payments'}
+              </button>
+            )}
           </div>
           <div className="table-wrap">
             {pendingPayments.length === 0 ? (
@@ -256,6 +360,7 @@ export default function FinanceView({ token }) {
               <table>
                 <thead>
                   <tr>
+                    <th style={{ width: 30 }}></th>
                     <th>Tracking #</th>
                     <th>Address</th>
                     <th>Recorded By</th>
@@ -269,6 +374,14 @@ export default function FinanceView({ token }) {
                 <tbody>
                   {pendingPayments.map(p => (
                     <tr key={p.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedPayments.includes(p.id)}
+                          onChange={() => toggleSelectPayment(p.id)}
+                          style={{ width: 16, height: 16, cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={{ fontWeight: 700, color: 'var(--clr-accent)' }}>#{p.tracking_number}</td>
                       <td style={{ fontSize: 12, color: 'var(--clr-text-muted)' }}>{p.client_address}</td>
                       <td>

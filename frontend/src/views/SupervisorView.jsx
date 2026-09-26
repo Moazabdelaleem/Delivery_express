@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllOrders, createOrder, updateOrder, deleteOrder, getUsersByRole, createReturn, getShiftSummary, castVote, cancelReturn, forceTransitReturn } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
+import FleetMap from '../components/FleetMap.jsx';
+import SmartFilterBar from '../components/SmartFilterBar.jsx';
+import AudioWaveformPlayer from '../components/AudioWaveformPlayer.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
 import { useWindowFocus } from '../useWindowFocus.js';
@@ -200,10 +203,25 @@ export default function SupervisorView({ token, user }) {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const liableOrders = orders.filter(o => o.is_liable);
-  const filtered = filter === 'liable'
-    ? liableOrders
-    : filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const filtered = orders.filter(o => {
+    const matchesFilter = filter === 'liable'
+      ? o.is_liable
+      : filter === 'all' ? true : o.status === filter;
+    
+    if (!matchesFilter) return false;
+    if (!searchQuery.trim()) return true;
+
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (o.tracking_number && o.tracking_number.toLowerCase().includes(q)) ||
+      (o.client_address && o.client_address.toLowerCase().includes(q)) ||
+      (o.delivery_guy_name && o.delivery_guy_name.toLowerCase().includes(q)) ||
+      (o.order_details && o.order_details.toLowerCase().includes(q))
+    );
+  });
 
   const counts = orders.reduce((acc, o) => {
     acc[o.status] = (acc[o.status] || 0) + 1;
@@ -284,26 +302,24 @@ export default function SupervisorView({ token, user }) {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-        {['all', 'assigned', 'in_transit', 'delivered', 'cash_cleared', 'delivery_failed'].map(s => (
-          <button
-            key={s}
-            className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-ghost'}`}
-            onClick={() => setFilter(s)}
-          >
-            {s === 'all' ? 'All' : STATUS_LABEL[s]}
-            {s !== 'all' && counts[s] ? ` (${counts[s]})` : ''}
-          </button>
-        ))}
-        <button
-          className={`btn btn-sm ${filter === 'liable' ? 'btn-warning' : 'btn-ghost'}`}
-          onClick={() => setFilter('liable')}
-          style={filter !== 'liable' && liableOrders.length > 0 ? { borderColor: '#f59e0b', color: '#f59e0b' } : {}}
-        >
-          ⚠️ Liable {liableOrders.length > 0 ? `(${liableOrders.length})` : ''}
-        </button>
-      </div>
+      {/* Fleet & Route GIS Map */}
+      <FleetMap drivers={drivers} orders={orders} height={320} />
+
+      {/* Smart Search & Filter Bar */}
+      <SmartFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        activeFilter={filter}
+        onFilterChange={setFilter}
+        filterOptions={[
+          { id: 'all', label: `All (${orders.length})` },
+          { id: 'assigned', label: `Assigned (${counts.assigned || 0})` },
+          { id: 'in_transit', label: `In Transit (${counts.in_transit || 0})` },
+          { id: 'delivered', label: `Delivered (${counts.delivered || 0})` },
+          { id: 'delivery_failed', label: `Failed/Return (${(counts.delivery_failed || 0) + (counts.returned_to_company || 0)})` },
+          { id: 'liable', label: `⚠️ Liable (${liableOrders.length})` }
+        ]}
+      />
 
       {/* Orders Table */}
       <div className="card">

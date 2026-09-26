@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllOrders, getAllWallets, getPendingUsers, approveUser, rejectUser, getDriverLedger, getShiftSummary, getReturnsQueue, managerOverrideReturn, getUsersByRole } from '../api.js';
+import FleetMap from '../components/FleetMap.jsx';
+import SmartFilterBar from '../components/SmartFilterBar.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
 import { useWindowFocus } from '../useWindowFocus.js';
@@ -15,6 +17,7 @@ export default function ManagerView({ token }) {
   const [activeTab, setActiveTab] = useState('orders');
   const [submitting, setSub]      = useState({});
   const [filter, setFilter]       = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [reassignDriverMap, setReassignDriverMap] = useState({});
 
   const [ledgerModal, setLedgerModal] = useState(null); // driver object
@@ -125,7 +128,18 @@ export default function ManagerView({ token }) {
     return acc;
   }, {});
 
-  const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const filtered = orders.filter(o => {
+    const matchesFilter = filter === 'all' ? true : o.status === filter;
+    if (!matchesFilter) return false;
+    if (!searchQuery.trim()) return true;
+
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (o.tracking_number && o.tracking_number.toLowerCase().includes(q)) ||
+      (o.client_address && o.client_address.toLowerCase().includes(q)) ||
+      (o.delivery_guy_name && o.delivery_guy_name.toLowerCase().includes(q))
+    );
+  });
 
   if (loading) return (
     <div style={{ padding: '28px 24px' }}>
@@ -218,6 +232,9 @@ export default function ManagerView({ token }) {
         </div>
       </div>
 
+      {/* Live Fleet & GIS Map */}
+      <FleetMap drivers={drivers} orders={orders} height={320} />
+
       {/* Tabs */}
       <div className="tab-row" style={{ marginBottom: 20 }}>
         <button className={`tab-btn ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>📋 Orders</button>
@@ -232,15 +249,22 @@ export default function ManagerView({ token }) {
 
       {/* Orders Tab */}
       {activeTab === 'orders' && (
-        <div className="card">
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-            {['all', 'assigned', 'in_transit', 'delivered', 'cash_cleared', 'delivery_failed'].map(s => (
-              <button key={s} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setFilter(s)}>
-                {s === 'all' ? 'All' : STATUS_LABEL[s]}
-                {s !== 'all' && counts[s] ? ` (${counts[s]})` : ''}
-              </button>
-            ))}
-          </div>
+        <div>
+          <SmartFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            activeFilter={filter}
+            onFilterChange={setFilter}
+            filterOptions={[
+              { id: 'all', label: `All (${orders.length})` },
+              { id: 'assigned', label: `Assigned (${counts.assigned || 0})` },
+              { id: 'in_transit', label: `In Transit (${counts.in_transit || 0})` },
+              { id: 'delivered', label: `Delivered (${counts.delivered || 0})` },
+              { id: 'cash_cleared', label: `Cash Cleared (${counts.cash_cleared || 0})` },
+              { id: 'delivery_failed', label: `Failed/Return (${counts.delivery_failed || 0})` }
+            ]}
+          />
+          <div className="card">
           <div className="table-wrap">
             <table>
               <thead>
@@ -254,12 +278,12 @@ export default function ManagerView({ token }) {
                     <td>{o.delivery_guy_name || <span style={{ color: 'var(--clr-text-dim)' }}>—</span>}</td>
                     <td className="amount">EGP {parseFloat(o.order_amount).toFixed(2)}</td>
                     <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] || o.status}</span></td>
-                    <td style={{ fontSize: 11, color: 'var(--clr-text-dim)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       )}
 

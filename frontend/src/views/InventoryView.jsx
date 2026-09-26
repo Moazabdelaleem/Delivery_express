@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
 import { getInventoryQueue, inventoryHandoff, getReturnsQueue, verifyReturn, receiveItems, castVote, forceTransitReturn } from '../api.js';
 import PhotoCapture from '../components/PhotoCapture.jsx';
+import SmartFilterBar from '../components/SmartFilterBar.jsx';
 import { toast } from '../App.jsx';
 import { STATUS_LABEL } from '../constants/statusLabels.js';
 import { useWindowFocus } from '../useWindowFocus.js';
@@ -122,6 +122,38 @@ export default function InventoryView({ token }) {
   const [receiveModal, setReceiveModal] = useState(null); // return object
   const [dmgQty, setDmgQty]         = useState('0');
   const [condNotes, setCondNotes]   = useState('');
+  const [selectedOrders, setSelectedOrders] = useState([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const toggleSelectOrder = (id) => {
+    setSelectedOrders(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkHandoff = async () => {
+    if (selectedOrders.length === 0) return;
+    if (!window.confirm(`Bulk confirm handoff for ${selectedOrders.length} packages?`)) return;
+    setBulkSubmitting(true);
+    let successCount = 0;
+    try {
+      for (const orderId of selectedOrders) {
+        try {
+          await inventoryHandoff(orderId, { handed_over: true, note: 'Bulk package handoff verified' }, token);
+          successCount++;
+        } catch (_) {}
+      }
+      toast.success(`Successfully confirmed handoff for ${successCount} package(s)!`);
+      setSelectedOrders([]);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -284,24 +316,79 @@ export default function InventoryView({ token }) {
         </div>
       </div>
 
+      {/* Smart Search & Filter Bar */}
+      <SmartFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        activeFilter={filter}
+        onFilterChange={setFilter}
+        filterOptions={[
+          { id: 'all', label: `All Orders (${orders.length})` },
+          { id: 'pending', label: `Pending Handoff (${pending.length})` },
+          { id: 'returns', label: `Active Returns (${activeReturns.length})` }
+        ]}
+      />
+
       {/* TAB 1: HANDOFF QUEUE */}
       {activeTab === 'handoff' && (
         <>
+          {selectedOrders.length > 0 && (
+            <div className="bulk-action-bar">
+              <div className="bulk-action-title">
+                📦 Bulk Operation: {selectedOrders.length} package(s) selected
+              </div>
+              <div className="bulk-action-btns">
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={handleBulkHandoff}
+                  disabled={bulkSubmitting}
+                >
+                  {bulkSubmitting ? <span className="spinner" /> : '✅ Confirm Bulk Handoff'}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setSelectedOrders([])}
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="card" style={{ marginBottom: 20 }}>
             <div className="card-header">
               <span className="card-title">
                 ⏳ Pending Handoff
                 <span style={{ background: 'var(--clr-warning)', color: 'white', borderRadius: 999, padding: '1px 8px', fontSize: 11 }}>{pending.length}</span>
               </span>
+              {pending.length > 0 && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    if (selectedOrders.length === pending.length) setSelectedOrders([]);
+                    else setSelectedOrders(pending.map(o => o.id));
+                  }}
+                >
+                  {selectedOrders.length === pending.length ? 'Deselect All' : 'Select All Pending'}
+                </button>
+              )}
             </div>
             {pending.length === 0 ? (
               <div className="empty-state"><div className="empty-icon">✅</div><p>Queue is clear — no packages pending handoff.</p></div>
             ) : (
               <div className="card-grid">
                 {pending.map(o => (
-                  <div key={o.id} className="card" style={{ borderLeft: '3px solid var(--clr-warning)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, color: 'var(--clr-accent)', fontSize: 13 }}>{o.tracking_number}</span>
+                  <div key={o.id} className="card" style={{ borderLeft: '3px solid var(--clr-warning)', position: 'relative' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.includes(o.id)}
+                          onChange={() => toggleSelectOrder(o.id)}
+                          style={{ width: 16, height: 16, cursor: 'pointer' }}
+                        />
+                        <span style={{ fontWeight: 700, color: 'var(--clr-accent)', fontSize: 13 }}>{o.tracking_number}</span>
+                      </div>
                       <span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status]}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--clr-text-muted)', marginBottom: 4 }}>📍 {o.client_address}</div>

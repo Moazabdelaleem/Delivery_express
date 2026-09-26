@@ -108,6 +108,8 @@ function ToastContainer() {
   );
 }
 
+import ThemeToggle from './components/ThemeToggle.jsx';
+
 function Topbar({ user, onLogout }) {
   const initials = user.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -118,6 +120,7 @@ function Topbar({ user, onLogout }) {
         Delivery Express
       </div>
       <div className="topbar-right">
+        <ThemeToggle />
         <span style={{ fontSize: 13, color: 'var(--clr-text-muted)' }}>
           {ROLE_LABELS[user.role] || user.role}
         </span>
